@@ -52,7 +52,8 @@ void		WWMath::Init(void)
 {
 	LookupTableMgrClass::Init();
 
-	for (int a=0;a<ARC_TABLE_SIZE;++a) {
+	int a;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (a=0;a<ARC_TABLE_SIZE;++a) {
 		float cv=float(a-ARC_TABLE_SIZE/2)*(1.0f/(ARC_TABLE_SIZE/2));
 		_FastAcosTable[a]=DetMath::Acos(cv);
 		_FastAsinTable[a]=DetMath::Asin(cv);

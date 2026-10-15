@@ -19,7 +19,7 @@
 #define _WIN32_WINNT 0x0400
 
 #include "thread.h"
-#include "except.h"
+#include "Except.h"
 #include "wwdebug.h"
 #include <process.h>
 #include <windows.h>
@@ -55,6 +55,7 @@ void __cdecl ThreadClass::Internal_Thread_Function(void* params)
 #ifdef _WIN32
 	Register_Thread_ID(tc->ThreadID, tc->ThreadName);
 
+#ifdef _MSC_VER
 	if (tc->ExceptionHandler != NULL) {
 		__try {
 			tc->Thread_Function();
@@ -62,6 +63,11 @@ void __cdecl ThreadClass::Internal_Thread_Function(void* params)
 	} else {
 		tc->Thread_Function();
 	}
+#else
+	// Structured exception handling (__try/__except) is MSVC-only; crashes are still reported by
+	// the process-wide unhandled exception filter.
+	tc->Thread_Function();
+#endif
 
 #else //_WIN32
 	tc->Thread_Function();

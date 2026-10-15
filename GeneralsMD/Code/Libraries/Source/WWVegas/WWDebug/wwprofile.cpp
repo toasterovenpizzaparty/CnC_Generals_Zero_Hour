@@ -49,14 +49,15 @@
  *   WWProfileManager::Release_In_Order_Iterator -- Return an "in-order" iterator              *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "zh_intrin.h"
 #include "always.h"
 #include "wwprofile.h"
-#include "fastallocator.h"
+#include "FastAllocator.h"
 #include "wwdebug.h"
 #include <windows.h>
 //#include "systimer.h"
 #include "systimer.h"
-#include "rawfile.h"
+#include "RAWFILE.H"
 #include "ffactory.h"
 #include "simplevec.h"
 #include "cpudetect.h"
@@ -96,26 +97,9 @@ WWINLINE double WWProfile_Get_Inv_Processor_Ticks_Per_Second(void)
  * HISTORY:                                                                                    *
  *   9/24/2000  gth : Created.                                                                 *
  *=============================================================================================*/
-inline void WWProfile_Get_Ticks(_int64 * ticks)
+inline void WWProfile_Get_Ticks(__int64 * ticks)
 {
-#ifdef _UNIX
-       *ticks = TIMEGETTIME();
-#else
-	__asm
-	{
-		push edx;
-		push ecx;
-		push eax;
-		mov ecx,ticks;
-		_emit 0Fh
-		_emit 31h
-		mov [ecx],eax;
-		mov [ecx+4],edx;
-		pop eax;
-		pop ecx;
-		pop edx;
-	}
-#endif
+	*ticks = (__int64)ZH_Rdtsc();	// was RDTSC inline assembly
 }
 
 

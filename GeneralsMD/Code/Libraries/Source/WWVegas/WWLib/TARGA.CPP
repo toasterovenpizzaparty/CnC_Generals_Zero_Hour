@@ -60,7 +60,7 @@
 *
 ****************************************************************************/
 
-#include "targa.h"
+#include "TARGA.H"
 #ifndef TGA_USES_WWLIB_FILE_CLASSES
 #include <stdio.h>
 #endif
@@ -68,12 +68,12 @@
 #include <memory.h>
 #include <string.h>
 #ifdef TGA_USES_WWLIB_FILE_CLASSES
-#include "wwfile.h"
+#include "WWFILE.H"
 #include "ffactory.h"
 #else
 #include <io.h>
 #include <fcntl.h>
-#include <sys\stat.h>
+#include <sys/stat.h>
 #endif
 
 
@@ -827,44 +827,12 @@ void Targa::XFlip(void)
 
 static __forceinline void _swapBytes(char *p1, char *p2, unsigned count)
 {
-  _asm
-  {
-    mov esi,[p1]
-    mov edi,[p2]
-    mov ebx,[count]
-    mov ecx,ebx
-    shr ecx,4
-    jz  lessThan16
-  lp:
-    mov eax,dword ptr [esi]
-    mov edx,dword ptr [esi+4]
-    xchg eax,dword ptr [edi]
-    xchg edx,dword ptr [edi+4]
-    mov dword ptr [esi],eax
-    mov dword ptr [esi+4],edx
-    mov eax,dword ptr [esi+8]
-    mov edx,dword ptr [esi+12]
-    xchg eax,dword ptr [edi+8]
-    xchg edx,dword ptr [edi+12]
-    mov dword ptr [esi+8],eax
-    mov dword ptr [esi+12],edx
-    add esi,16
-    add edi,16
-    dec ecx
-    jnz lp
-  lessThan16:
-    and ebx,15
-  lpLessThan16:
-    jz done
-    mov al,byte ptr [esi]
-    xchg al,byte ptr [edi]
-    mov byte ptr [edi],al
-    inc esi
-    inc edi
-    dec ebx
-    jmp lpLessThan16
-  done:
-  }
+	// Swap two non-overlapping byte ranges (was hand-written x86 assembly).
+	while (count--) {
+		char t = *p1;
+		*p1++ = *p2;
+		*p2++ = t;
+	}
 }
 
 void Targa::YFlip(void)

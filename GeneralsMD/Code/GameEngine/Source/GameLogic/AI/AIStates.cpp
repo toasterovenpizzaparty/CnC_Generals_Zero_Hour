@@ -43,7 +43,7 @@
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
 #include "Common/Xfer.h"
-#include "Common/XFerCRC.h"
+#include "Common/XferCRC.h"
 
 #include "GameClient/ControlBar.h"
 #include "GameClient/FXList.h"
