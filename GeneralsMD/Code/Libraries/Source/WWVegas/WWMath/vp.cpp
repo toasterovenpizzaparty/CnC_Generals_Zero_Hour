@@ -535,5 +535,5 @@ void VectorProcessorClass::ClampMin(float *dst, float *src, const float min, con
 void VectorProcessorClass::Power(float *dst, float *src, const float pow, const int count)
 {
 	for (int i=0; i<count; i++)
-		dst[i]=powf(src[i],pow);
+		dst[i]=DetMath::Powf(src[i],pow);
 }

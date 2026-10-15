@@ -698,7 +698,7 @@ WWINLINE void Vector3::Scale(const Vector3 & scale)
  *=============================================================================================*/
 WWINLINE void Vector3::Rotate_X(float angle)
 {
-	Rotate_X(sinf(angle),cosf(angle));
+	Rotate_X(DetMath::Sinf(angle),DetMath::Cosf(angle));
 }
 
 
@@ -738,7 +738,7 @@ WWINLINE void Vector3::Rotate_X(float s_angle,float c_angle)
  *=============================================================================================*/
 WWINLINE void Vector3::Rotate_Y(float angle)
 {
-	Rotate_Y(sinf(angle),cosf(angle));
+	Rotate_Y(DetMath::Sinf(angle),DetMath::Cosf(angle));
 }
 
 
@@ -778,7 +778,7 @@ WWINLINE void Vector3::Rotate_Y(float s_angle,float c_angle)
  *=============================================================================================*/
 WWINLINE void Vector3::Rotate_Z(float angle)
 {
-	Rotate_Z(sinf(angle),cosf(angle));
+	Rotate_Z(DetMath::Sinf(angle),DetMath::Cosf(angle));
 }
 
 

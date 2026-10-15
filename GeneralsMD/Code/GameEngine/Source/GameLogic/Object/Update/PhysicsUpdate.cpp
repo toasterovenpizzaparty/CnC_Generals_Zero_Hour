@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, November 2001
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 // please talk to MDC (x36804) before taking this out
 #define NO_DEBUG_CRC
@@ -744,7 +745,7 @@ UpdateSleepTime PhysicsBehavior::update()
 			{
 				Vector3 xvec = mtx.Get_X_Vector();
 				Real xy = sqrtf(sqr(xvec.X) + sqr(xvec.Y));
-				Real pitchAngle = atan2(xvec.Z, xy);
+				Real pitchAngle = DetMath::Atan2(xvec.Z, xy);
 				Real remainingAngle = (offset > 0) ? ((PI/2) - pitchAngle) : (-(PI/2) + pitchAngle);
 				Real s = Sin(remainingAngle);
 				pitchRateToUse *= s;

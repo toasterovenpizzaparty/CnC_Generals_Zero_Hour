@@ -25,6 +25,7 @@
 // JetAIUpdate.cpp //////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_LOCOMOTORSET_NAMES
 
@@ -521,7 +522,7 @@ public:
 		
 		Coord3D intermedPt;
 		Bool intermed = false;
-		Real orient = atan2(ppinfo.runwayPrep.y - ppinfo.parkingSpace.y, ppinfo.runwayPrep.x - ppinfo.parkingSpace.x);
+		Real orient = DetMath::Atan2(ppinfo.runwayPrep.y - ppinfo.parkingSpace.y, ppinfo.runwayPrep.x - ppinfo.parkingSpace.x);
 		if (fabs(stdAngleDiff(orient, ppinfo.parkingOrientation)) > PI/128)
 		{
 			intermedPt.z = (ppinfo.parkingSpace.z + ppinfo.runwayPrep.z) * 0.5f;
@@ -2150,7 +2151,7 @@ void JetAIUpdate::positionLockon()
 	Real dx = getObject()->getPosition()->x - pos.x;
 	Real dy = getObject()->getPosition()->y - pos.y;
 	if (dx || dy)
-		m_lockonDrawable->setOrientation(atan2(dy, dx));
+		m_lockonDrawable->setOrientation(DetMath::Atan2(dy, dx));
 
 	// the Gaussian sum, to avoid keeping a running total:
 	//

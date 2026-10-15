@@ -27,6 +27,7 @@
 // Desc:   
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_GEOMETRY_NAMES
 
@@ -185,10 +186,10 @@ void GeometryInfo::calcPitches(const Coord3D& thisPos, const GeometryInfo& that,
 	/** @todo srj -- this could be better, by calcing it for all the corners, not just top-center
 		and bottom-center... oh well */
 	dz = (thatPos.z + that.getMaxHeightAbovePosition()) - thisCenter.z;
-	maxPitch = atan2(dz, dxy);
+	maxPitch = DetMath::Atan2(dz, dxy);
 
 	dz = (thatPos.z - that.getMaxHeightBelowPosition()) - thisCenter.z;
-	minPitch = atan2(dz, dxy);
+	minPitch = DetMath::Atan2(dz, dxy);
 }
 
 //=============================================================================
@@ -284,8 +285,8 @@ void GeometryInfo::get2DBounds(const Coord3D& geomCenter, Real angle, Region2D& 
 
 		case GEOMETRY_BOX:
 		{
-			Real c = (Real)cos(angle);
-			Real s = (Real)sin(angle);
+			Real c = (Real)DetMath::Cos(angle);
+			Real s = (Real)DetMath::Sin(angle);
 			Real exc = m_majorRadius*c;
 			Real eyc = m_minorRadius*c;
 			Real exs = m_majorRadius*s;

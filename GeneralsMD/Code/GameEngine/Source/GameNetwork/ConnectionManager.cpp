@@ -46,6 +46,7 @@
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/NetCommandWrapperList.h"
 #include "GameNetwork/NetworkUtil.h"
+#include "GameNetwork/NetworkTiming.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptActions.h"
 #include "GameLogic/ScriptEngine.h"
@@ -1217,7 +1218,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 	if ((lasttimesent == 0) || ((curTime - lasttimesent) > TheGlobalData->m_networkRunAheadMetricsTime)) {
 		if (m_localSlot == m_packetRouterSlot) {
 			// We are the packet router, time to compute a new run ahead for this game.
-			m_latencyAverages[m_localSlot] = m_frameMetrics.getAverageLatency();
+			m_latencyAverages[m_localSlot] = m_frameMetrics.getRunAheadLatency();
 
 			// since we are now using the display frame rate rather than the logic frame rate to get our average FPS,
 			// it doesn't make sense to send the desired logic frame rate if we "slugged" ourself.
@@ -1246,15 +1247,12 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 				minFps = TheGlobalData->m_framesPerSecondLimit; // Cap to 30 FPS.
 			}
 			DEBUG_LOG(("ConnectionManager::updateRunAhead - minFps after adjustment is %d\n", minFps));
-			Int newRunAhead = (Int)((getMaximumLatency() / 2.0) * (Real)minFps);
-			newRunAhead += (newRunAhead * TheGlobalData->m_networkRunAheadSlack) / 100; // Add in 10% of slack to the run ahead in case of network hiccups.
-			if (newRunAhead < MIN_RUNAHEAD) {
-				newRunAhead = MIN_RUNAHEAD; // make sure its at least MIN_RUNAHEAD.
-			}
-
-			if (newRunAhead > (MAX_FRAMES_AHEAD / 2)) {
-				newRunAhead = MAX_FRAMES_AHEAD / 2; // dont let run ahead get out of hand.
-			}
+			// getMaximumLatency() is the sum of the two worst round trips to the packet router, so half of
+			// it is the worst one-way path of a command (sender -> router -> receiver).  The latencies
+			// already include a jitter margin.  ComputeRunAhead rounds up, adds processing margin and
+			// slack, grows immediately but shrinks gently, and clamps to [MIN_RUNAHEAD, MAX_FRAMES_AHEAD/2].
+			Int newRunAhead = ComputeRunAhead(getMaximumLatency() / (Real)2.0, minFps, TheGlobalData->m_networkRunAheadSlack,
+				oldRunAhead, MIN_RUNAHEAD, MAX_FRAMES_AHEAD / 2);
 
 			NetRunAheadCommandMsg *msg = newInstance(NetRunAheadCommandMsg);
 			msg->setPlayerID(m_localSlot);
@@ -1333,7 +1331,7 @@ void ConnectionManager::updateRunAhead(Int oldRunAhead, Int frameRate, Bool didS
 			if (DoesCommandRequireACommandID(msg->getNetCommandType())) {
 				msg->setID(GenerateNextCommandID());
 			}
-			msg->setAverageLatency(m_frameMetrics.getAverageLatency());
+			msg->setAverageLatency(m_frameMetrics.getRunAheadLatency()); // includes a jitter margin, see FrameMetrics::getRunAheadLatency
 
 			// see above for explanation.
 //			if (didSelfSlug) {

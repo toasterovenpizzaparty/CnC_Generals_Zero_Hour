@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_SHADOW_NAMES								// for TheShadowNames[]
 #define DEFINE_WEAPONSLOTTYPE_NAMES
@@ -368,7 +369,7 @@ public:
 			}
 
 
-			Real orient = atan2( moveToPos.y - startPos.y, moveToPos.x - startPos.x);
+			Real orient = DetMath::Atan2( moveToPos.y - startPos.y, moveToPos.x - startPos.x);
 			if( m_data.m_distToTarget > 0 )
 			{
 				const Real SLOP = 1.5f;
@@ -1117,7 +1118,7 @@ protected:
 
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
-					orientation = atan2(force.y, force.x);
+					orientation = DetMath::Atan2(force.y, force.x);
 
 			}
 		}
@@ -1205,7 +1206,7 @@ protected:
 				objUp->applyForce(&force);
 				if (m_orientInForceDirection)
 				{
-					orientation = atan2(force.y, force.x);
+					orientation = DetMath::Atan2(force.y, force.x);
 				}
 				DUMPREAL(orientation);
 				objUp->setAngles(orientation, 0, 0);

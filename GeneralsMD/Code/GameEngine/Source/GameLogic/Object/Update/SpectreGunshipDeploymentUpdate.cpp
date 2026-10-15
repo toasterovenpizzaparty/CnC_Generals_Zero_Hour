@@ -28,6 +28,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_DEATH_NAMES
 
@@ -224,7 +225,7 @@ Bool SpectreGunshipDeploymentUpdate::initiateIntentToDoSpecialPower(const Specia
     newGunship->setPosition( &creationCoord );
 
     //ORIENTATION
-		Real orient = atan2( m_initialTargetPosition.y - creationCoord.y, m_initialTargetPosition.x - creationCoord.x);
+		Real orient = DetMath::Atan2( m_initialTargetPosition.y - creationCoord.y, m_initialTargetPosition.x - creationCoord.x);
     newGunship->setOrientation( orient );
     
     // ID

@@ -26,6 +26,7 @@
 // Author: Graham Smallwood, March 2002
 // Desc:   State machine that controls the approach and deployment of airborne cargo
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_WEAPONSLOTTYPE_NAMES
 
@@ -1123,7 +1124,7 @@ StateReturnType RecoverFromOffMapState::update() // Success if we should try aga
 		enterCoord.z = owner->getPosition()->z;
 	owner->setPosition(&enterCoord);
 
-	Real enterAngle = atan2(ai->getMoveToPos()->y - enterCoord.y, ai->getMoveToPos()->x - enterCoord.x);
+	Real enterAngle = DetMath::Atan2(ai->getMoveToPos()->y - enterCoord.y, ai->getMoveToPos()->x - enterCoord.x);
 	owner->setOrientation(enterAngle);
 
 	PhysicsBehavior* physics = owner->getPhysics();

@@ -441,8 +441,8 @@ WWINLINE void Matrix4x4::Init_Perspective(float hfov,float vfov,float znear,floa
 	assert(zfar > znear);
 
 	Make_Identity();
-	Row[0][0] = static_cast<float>(1.0 / tan(hfov*0.5));
-	Row[1][1] = static_cast<float>(1.0 / tan(vfov*0.5));
+	Row[0][0] = static_cast<float>(1.0 / DetMath::Tan(hfov*0.5));
+	Row[1][1] = static_cast<float>(1.0 / DetMath::Tan(vfov*0.5));
 	Row[2][2] = -(zfar + znear) / (zfar - znear);
 	Row[2][3] = static_cast<float>(-(2.0*zfar*znear) / (zfar - znear));
 	Row[3][2] = -1.0f;

@@ -30,6 +30,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #define DEFINE_SURFACECATEGORY_NAMES
 #define DEFINE_LOCO_Z_NAMES
@@ -1298,7 +1299,7 @@ void Locomotor::moveTowardsPositionWheels(Object* obj, PhysicsBehavior *physics,
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = DetMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, angle);
 
 	Bool moveBackwards = false;
@@ -1637,7 +1638,7 @@ void Locomotor::moveTowardsPositionLegs(Object* obj, PhysicsBehavior *physics, c
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = DetMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 
 	if (m_template->m_wanderWidthFactor != 0.0f) {
 		Real angleLimit = PI/8 * m_template->m_wanderWidthFactor;
@@ -1770,7 +1771,7 @@ void Locomotor::moveTowardsPositionClimb(Object* obj, PhysicsBehavior *physics, 
 	Real angle = obj->getOrientation();
 //	Real relAngle = ThePartitionManager->getRelativeAngle2D( obj, &goalPos );
 //	Real desiredAngle = angle + relAngle;
-	Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+	Real desiredAngle = DetMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 	Real relAngle = stdAngleDiff(desiredAngle, angle);
 
 	if (moveBackwards) {
@@ -1861,7 +1862,7 @@ void Locomotor::moveTowardsPositionWings(Object* obj, PhysicsBehavior *physics, 
 			Real angleTowardPos = 
 					(isNearlyZero(dx) && isNearlyZero(dy)) ?
 					obj->getOrientation() :
-					atan2(dy, dx);
+					DetMath::Atan2(dy, dx);
 
 			Real aimDir = (PI - PI/8);
 			angleTowardPos += aimDir;
@@ -2157,7 +2158,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 		Real dy = goalPos.y - turnPos.y;
 		// If we are very close to the goal, we twitch due to rounding error.  So just return. jba.
 		if (fabs(dx)<0.1f && fabs(dy)<0.1f) return TURN_NONE; 
-		Real desiredAngle = atan2(dy, dx);
+		Real desiredAngle = DetMath::Atan2(dy, dx);
 		Real amount = stdAngleDiff(desiredAngle, angle);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
@@ -2179,7 +2180,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 		// so, the thing is, we want to rotate ourselves so that our *center* is rotated
 		// by the given amount, but the rotation must be around turnPos. so do a little
 		// back-calculation.
-		Real angleDesiredForTurnPos = atan2(desiredPos.y - turnPos.y, desiredPos.x - turnPos.x);
+		Real angleDesiredForTurnPos = DetMath::Atan2(desiredPos.y - turnPos.y, desiredPos.x - turnPos.x);
 		amount = angleDesiredForTurnPos - angle;
 #endif
 		/// @todo srj -- there's probably a more efficient & more direct way to do this. find it.
@@ -2195,7 +2196,7 @@ PhysicsTurningType Locomotor::rotateObjAroundLocoPivot(Object* obj, const Coord3
 	}
 	else
 	{
-		Real desiredAngle = atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
+		Real desiredAngle = DetMath::Atan2(goalPos.y - obj->getPosition()->y, goalPos.x - obj->getPosition()->x);
 		Real amount = stdAngleDiff(desiredAngle, angle);
 		if (relAngle) *relAngle = amount;
 		if (amount>maxTurnRate) {
@@ -2529,7 +2530,7 @@ void Locomotor::maintainCurrentPositionWings(Object* obj, PhysicsBehavior *physi
 		Real angleTowardMaintainPos = 
 				(isNearlyZero(dx) && isNearlyZero(dy)) ?
 				obj->getOrientation() :
-				atan2(dy, dx);
+				DetMath::Atan2(dy, dx);
 
 		Real aimDir = (PI - PI/8);
 		if (turnRadius < 0)
