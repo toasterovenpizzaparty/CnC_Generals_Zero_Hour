@@ -14,7 +14,7 @@ import sys
 
 CODE = os.getcwd()
 SEARCH_DIRS = [
-    "Compat", "Compat/d3dx8compat",
+    "Compat", "Compat/d3dx8compat", "Compat/gamespy",
     "GameEngine/Include", "GameEngine/Include/Precompiled", "GameEngineDevice/Include", "Main",
     "Libraries/Include", "Libraries/Source/WWVegas", "Libraries/Source/WWVegas/WWLib",
     "Libraries/Source/WWVegas/WWMath", "Libraries/Source/WWVegas/WWDebug",

@@ -1591,7 +1591,8 @@ void SphereMeshClass::Generate(float radius, int slices, int stacks)
 	fans = W3DNEWARRAY int[fan_size * fan_ct];
 	
 	// Do Fan #1
-	for (int ct = 0; ct < fan_size; ct++) {
+	int ct;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (ct = 0; ct < fan_size; ct++) {
 		fans[ct] = ct;
 	}
 	//fans[ct] = 1;

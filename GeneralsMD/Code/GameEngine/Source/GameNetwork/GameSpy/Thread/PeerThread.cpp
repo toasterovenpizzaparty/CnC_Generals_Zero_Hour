@@ -513,7 +513,7 @@ Int PeerThreadClass::findServer( SBServer server )
 	return addServerToMap(server);
 }
 
-static enum CallbackType
+enum CallbackType
 {
 	CALLBACK_CONNECT,
 	CALLBACK_ERROR,
@@ -1831,7 +1831,8 @@ void PeerThreadClass::handleQMMatch(PEER peer, Int mapIndex, Int seed,
 		m_qmStatus = QM_MATCHED;
 		peerLeaveRoom(peer, GroupRoom, "");
 
-		for (Int i=0; i<MAX_SLOTS; ++i)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<MAX_SLOTS; ++i)
 		{
 			if (playerName[i] && stricmp(playerName[i], m_loginName.c_str()))
 			{

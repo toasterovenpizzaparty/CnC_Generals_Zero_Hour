@@ -6,7 +6,26 @@ add_library(d3dx8compat STATIC d3dx8compat/d3dx8compat.cpp d3dx8compat/d3dx8tex.
 target_include_directories(d3dx8compat PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/d3dx8compat)
 target_link_libraries(d3dx8compat PUBLIC zh_options d3d8)
 
-# Placeholder targets, filled in incrementally.
-foreach(t zh_zlib zh_lzhl zh_gamespy_stub zh_platform_stubs zh_miles_stub zh_bink_stub)
-    add_library(${t} INTERFACE)
-endforeach()
+# zlib 1.3.1 (vendored at the location the original project expected it)
+set(ZLIB_DIR ${ZH_CODE}/Libraries/Source/Compression/ZLib)
+add_library(zh_zlib STATIC
+    ${ZLIB_DIR}/adler32.c ${ZLIB_DIR}/compress.c ${ZLIB_DIR}/crc32.c ${ZLIB_DIR}/deflate.c
+    ${ZLIB_DIR}/gzclose.c ${ZLIB_DIR}/gzlib.c ${ZLIB_DIR}/gzread.c ${ZLIB_DIR}/gzwrite.c
+    ${ZLIB_DIR}/infback.c ${ZLIB_DIR}/inffast.c ${ZLIB_DIR}/inflate.c ${ZLIB_DIR}/inftrees.c
+    ${ZLIB_DIR}/trees.c ${ZLIB_DIR}/uncompr.c ${ZLIB_DIR}/zutil.c)
+target_compile_definitions(zh_zlib PUBLIC Z_PREFIX)
+target_include_directories(zh_zlib PUBLIC ${ZLIB_DIR})
+target_link_libraries(zh_zlib PRIVATE zh_options)
+
+# LZH-Light (not in the source release) - decoding stub, see lzhl/CompLibHeader/lzhl.h
+add_library(zh_lzhl STATIC lzhl/lzhl_stub.cpp)
+target_include_directories(zh_lzhl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lzhl)
+target_link_libraries(zh_lzhl PRIVATE zh_options)
+
+# GameSpy SDK (not in the source release; service shut down) - offline stand-in
+add_library(zh_gamespy_stub STATIC gamespy/gamespy_stub.cpp)
+target_include_directories(zh_gamespy_stub PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/gamespy)
+target_link_libraries(zh_gamespy_stub PRIVATE zh_options)
+
+# Placeholder for platform pieces still to be replaced.
+add_library(zh_platform_stubs INTERFACE)

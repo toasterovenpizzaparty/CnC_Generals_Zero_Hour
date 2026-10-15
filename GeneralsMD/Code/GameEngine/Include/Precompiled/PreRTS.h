@@ -41,7 +41,9 @@ class STLSpecialAlloc;
 // PLEASE DO NOT ABUSE WINDOWS OR IT WILL BE REMOVED ENTIRELY. :-)
 //--------------------------------------------------------------------------------- System Includes 
 #define WIN32_LEAN_AND_MEAN
+#if ZH_HAS_ATL
 #include <atlbase.h>
+#endif
 #include <windows.h>
 
 #include <assert.h>
@@ -49,7 +51,7 @@ class STLSpecialAlloc;
 #include <direct.h>
 #include <excpt.h>
 #include <float.h>
-#include <fstream.h>
+// (<fstream.h>, the pre-standard iostream header, was included here but is unused)
 #include <imagehlp.h>
 #include <io.h>
 #include <limits.h>

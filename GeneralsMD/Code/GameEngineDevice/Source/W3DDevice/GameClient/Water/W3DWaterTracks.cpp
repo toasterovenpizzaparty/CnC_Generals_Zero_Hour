@@ -80,7 +80,7 @@ WaterTracksRenderSystem *TheWaterTracksRenderSystem=NULL;	///< singleton for tra
 
 static Bool pauseWaves=FALSE;
 
-enum waveType
+enum waveType : int
 {
 	WaveTypeFirst,
 	WaveTypePond=WaveTypeFirst,

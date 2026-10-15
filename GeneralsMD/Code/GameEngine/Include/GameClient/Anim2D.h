@@ -130,6 +130,7 @@ enum Anim2DStatus
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------
+class Anim2DCollection;	// forward declaration (Visual C++ let 'friend class' introduce the name)
 class Anim2D : public MemoryPoolObject,
 							 public Snapshot
 {

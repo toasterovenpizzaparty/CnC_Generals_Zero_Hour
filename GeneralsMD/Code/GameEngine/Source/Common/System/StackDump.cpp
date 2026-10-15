@@ -66,6 +66,26 @@ void StackDumpDefaultHandler(const char*line)
 
 
 //*****************************************************************************
+// Current instruction, stack and frame pointer, for starting a stack walk (was inline assembly).
+//*****************************************************************************
+static void ZH_CaptureRegisters(DWORD &eip, DWORD &esp, DWORD &ebp)
+{
+	CONTEXT ctx;
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.ContextFlags = CONTEXT_FULL;
+	RtlCaptureContext(&ctx);
+#if defined(_M_IX86) || defined(__i386__)
+	eip = ctx.Eip;
+	esp = ctx.Esp;
+	ebp = ctx.Ebp;
+#else
+	// 64-bit: the 32-bit stack walker below cannot follow this stack; report nothing.
+	eip = esp = ebp = 0;
+#endif
+}
+
+
+//*****************************************************************************
 //*****************************************************************************
 void StackDump(void (*callback)(const char*))
 {
@@ -78,16 +98,7 @@ void StackDump(void (*callback)(const char*))
 
 	DWORD myeip,myesp,myebp;
 
-_asm
-{
-MYEIP1:
- mov eax, MYEIP1
- mov dword ptr [myeip] , eax
- mov eax, esp
- mov dword ptr [myesp] , eax
- mov eax, ebp
- mov dword ptr [myebp] , eax
-}
+	ZH_CaptureRegisters(myeip, myesp, myebp);	// was inline assembly
 
 
 	MakeStackTrace(myeip,myesp,myebp, 2, callback);
@@ -342,17 +353,7 @@ void FillStackAddresses(void**addresses, unsigned int count, unsigned int skip)
     gsContext.ContextFlags = CONTEXT_FULL;
 
 	DWORD myeip,myesp,myebp;
-_asm
-{
-MYEIP2:
- mov eax, MYEIP2
- mov dword ptr [myeip] , eax
- mov eax, esp
- mov dword ptr [myesp] , eax
- mov eax, ebp
- mov dword ptr [myebp] , eax
- xor eax,eax
-}
+	ZH_CaptureRegisters(myeip, myesp, myebp);	// was inline assembly
 memset(&stack_frame, 0, sizeof(STACKFRAME));
 stack_frame.AddrPC.Mode = AddrModeFlat;
 stack_frame.AddrPC.Offset = myeip;
@@ -560,7 +561,8 @@ void DumpExceptionInfo( unsigned int u, EXCEPTION_POINTERS* e_info )
 	/*
 	** Match the exception type with the error string and print it out
 	*/
-	for ( int i=0 ; _codes[i] != 0xffffffff ; i++ )
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for ( i=0 ; _codes[i] != 0xffffffff ; i++ )
 	{
 		if ( _codes[i] == e_info->ExceptionRecord->ExceptionCode )
 		{

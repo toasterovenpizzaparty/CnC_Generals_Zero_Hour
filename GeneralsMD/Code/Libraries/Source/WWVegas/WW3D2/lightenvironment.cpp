@@ -52,8 +52,10 @@ const float DIFFUSE_TO_AMBIENT_FRACTION = 1.0f;
 /*
 ** Static variables
 */
-static _LightingLODCutoff			= 0.5f;	
-static _LightingLODCutoff2			= 0.5f * 0.5f;
+// Implicit int (pre-standard C++): these have always been ints, i.e. 0.  Kept as int so the
+// lighting behaviour is unchanged.
+static int _LightingLODCutoff			= 0.5f;
+static int _LightingLODCutoff2			= 0.5f * 0.5f;
 
 
 /************************************************************************************************

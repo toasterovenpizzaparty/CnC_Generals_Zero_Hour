@@ -25,6 +25,8 @@
 ////// W3DWebBrowser.cpp ///////////////
 // July 2002 Bryan Cleveland
 
+#if ZH_HAS_ATL	// the embedded browser needs ATL and MSVC's #import, see WebBrowser.h
+
 #include "W3DDevice/GameClient/W3DWebBrowser.h"
 #include "WW3D2/texture.h"
 #include "WW3D2/textureloader.h"
@@ -72,3 +74,5 @@ void W3DWebBrowser::closeBrowserWindow(GameWindow *win)
 {
 	DX8WebBrowser::DestroyBrowser(win->winGetInstanceData()->m_decoratedNameString.str());
 }
+
+#endif // ZH_HAS_ATL

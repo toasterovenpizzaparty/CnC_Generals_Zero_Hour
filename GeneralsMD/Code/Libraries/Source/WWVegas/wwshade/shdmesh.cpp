@@ -500,7 +500,8 @@ void ShdMeshClass::Get_Obj_Space_Bounding_Box(AABoxClass & box) const
 	if (SubMeshes.Length()) {
 		SubMeshes[0].Mesh->Get_Bounding_Box(&box);
 		// If there are more than one submesh, merge all bounding boxes
-		for (int i=1;i<SubMeshes.Length();++i) {
+		int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=1;i<SubMeshes.Length();++i) {
 			AABoxClass tmp_b;
 			SubMeshes[i].Mesh->Get_Bounding_Box(&tmp_b);
 			
@@ -604,7 +605,8 @@ WW3DErrorType ShdMeshClass::Load_W3D(ChunkLoadClass& cload)
 	// next are the sub meshes
 	Free();
 	SubMeshes.Resize(hdr.NumSubMeshes);
-	for (int i=0;i<SubMeshes.Length(); ) 
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0;i<SubMeshes.Length(); ) 
 	{
 		cload.Open_Chunk();
 

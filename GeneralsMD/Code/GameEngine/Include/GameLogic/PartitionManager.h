@@ -78,6 +78,17 @@ const Real HUGE_DIST = 1000000.0f;
 
 //-----------------------------------------------------------------------------
 //           Type Definitions                                                      
+// Declared here as well as friends below: friend declarations alone are not visible to ordinary
+// name lookup in standard C++ (Visual C++ 6 made them visible).
+void hLineAddLooker(Int x1, Int x2, Int y, void *playerIndex);
+void hLineRemoveLooker(Int x1, Int x2, Int y, void *playerIndex);
+void hLineAddShrouder(Int x1, Int x2, Int y, void *playerIndex);
+void hLineRemoveShrouder(Int x1, Int x2, Int y, void *playerIndex);
+void hLineAddThreat(Int x1, Int x2, Int y, void *playerIndex);
+void hLineRemoveThreat(Int x1, Int x2, Int y, void *playerIndex);
+void hLineAddValue(Int x1, Int x2, Int y, void *playerIndex);
+void hLineRemoveValue(Int x1, Int x2, Int y, void *playerIndex);
+
 //-----------------------------------------------------------------------------
 
 struct Coord3D;
@@ -96,7 +107,7 @@ class ThingTemplate;
 class GhostObject;
 class CommandButton;
 
-enum CommandSourceType;
+enum CommandSourceType : int;
 
 // ----------------------------------------------------------------------------------------------
 enum ValueOrThreat
@@ -517,7 +528,8 @@ public:
 
 	inline Int wasSeenByAnyPlayers() const	///<check if a player in the game has seen the object but is now looking at fogged version.
 	{	
-		for (Int i=0; i<MAX_PLAYER_COUNT; i++)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<MAX_PLAYER_COUNT; i++)
 			if (m_everSeenByPlayer[i] && m_shroudedness[i] == OBJECTSHROUD_FOGGED)
 				return i;
 		return i;
@@ -1263,7 +1275,7 @@ protected:
 		This is an internal function that is used to implement the public 
 		getClosestObject and iterateObjects calls. 
 	*/
-	Object *PartitionManager::getClosestObjects(
+	Object *getClosestObjects(
 		const Object *obj, 
 		const Coord3D *pos, 
 		Real maxDist, 

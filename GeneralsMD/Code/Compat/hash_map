@@ -1,0 +1,2 @@
+// STLport/SGI <hash_map> replacement, see zh_hash_compat.h
+#include "zh_hash_compat.h"

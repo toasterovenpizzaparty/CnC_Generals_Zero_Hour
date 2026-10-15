@@ -1663,7 +1663,8 @@ winName.format("ScoreScreen.wnd:StaticTextScore%d", pos);
 					Bool sawAnyDisconnects = FALSE;
 					Bool anyNonAI = FALSE;
 					Bool anyAI = FALSE;
-					for (Int i=0; i<MAX_SLOTS; ++i)
+					Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+					for (i=0; i<MAX_SLOTS; ++i)
 					{
 						const GameSlot *slot = TheGameInfo->getConstSlot(i);
 						if (slot->isOccupied() && i != localSlotNum )

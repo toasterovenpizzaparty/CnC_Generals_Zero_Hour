@@ -192,7 +192,8 @@ void PopulateColorComboBox(Int comboBox, GameWindow *comboArray[], GameInfo *myG
 	UnicodeString colorName;
 	std::vector<bool> availableColors;
 
-	for (Int i = 0; i < numColors; i++)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < numColors; i++)
 		availableColors.push_back(true);
 
 	for (i = 0; i < MAX_SLOTS; i++)
@@ -338,7 +339,8 @@ void PopulateStartingCashComboBox(GameWindow *comboBox, GameInfo *myGame)
   const MultiplayerStartingMoneyList & startingCashMap = TheMultiplayerSettings->getStartingMoneyList(); 
   Int currentSelectionIndex = -1;
   
-  for ( MultiplayerStartingMoneyList::const_iterator it = startingCashMap.begin(); it != startingCashMap.end(); it++ )
+  MultiplayerStartingMoneyList::const_iterator it;	// hoisted: was visible after the loop under VC6 scoping rules
+  for ( it = startingCashMap.begin(); it != startingCashMap.end(); it++ )
   {
     Int newIndex = GadgetComboBoxAddEntry(comboBox, formatMoneyForStartingCashComboBox( *it ), 
                                           comboBox->winGetEnabled() ? comboBox->winGetEnabledTextColor() : comboBox->winGetDisabledTextColor());

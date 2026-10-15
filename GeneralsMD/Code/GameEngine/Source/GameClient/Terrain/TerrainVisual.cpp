@@ -170,7 +170,8 @@ SeismicSimulationFilterBase::SeismicSimStatusCode DomeStyleSeismicFilter::filter
 
     for ( Real *t = workspace; t < workspaceEnd; ++t ) *t = 0.0f;// clear the workspace
 
-    for (Int x = 0; x < radius; ++x)
+    Int x;	// hoisted: was visible after the loop under VC6 scoping rules
+    for (x = 0; x < radius; ++x)
     {
       for (Int y = 0; y < radius; ++y)
       {

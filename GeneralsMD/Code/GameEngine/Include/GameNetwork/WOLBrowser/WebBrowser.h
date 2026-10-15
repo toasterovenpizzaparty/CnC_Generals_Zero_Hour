@@ -46,11 +46,15 @@
 #define __WEBBROWSER_H__
 
 #include "Common/SubsystemInterface.h"
+#if ZH_HAS_ATL
 #include <atlbase.h>
+#endif
 #include <windows.h>
 #include <Common/GameMemory.h>
+#if ZH_HAS_ATL
 #include "EABrowserDispatch/BrowserDispatch.h"
 #include "FEBDispatch.h"
+#endif
 
 class GameWindow;
 
@@ -75,6 +79,8 @@ public:
 };
 
 
+
+#if ZH_HAS_ATL
 
 class WebBrowser :
 		public FEBDispatch<WebBrowser, IBrowserDispatch, &IID_IBrowserDispatch>,
@@ -124,4 +130,32 @@ class WebBrowser :
 	};
 
 extern CComObject<WebBrowser> *TheWebBrowser;
+
+#else // ZH_HAS_ATL
+
+// Without ATL the embedded browser is not available (the shipped game never creates it either:
+// TheWebBrowser stays NULL).  Same interface, no COM.
+class WebBrowser : public SubsystemInterface
+{
+	public:
+		void init( void );
+		void reset( void );
+		void update( void );
+
+		virtual Bool createBrowserWindow(char *tag, GameWindow *win) = 0;
+		virtual void closeBrowserWindow(GameWindow *win) = 0;
+
+		WebBrowserURL *makeNewURL(AsciiString tag);
+		WebBrowserURL *findURL(AsciiString tag);
+
+	protected:
+		WebBrowser();
+		virtual ~WebBrowser();
+
+		WebBrowserURL *m_urlList;
+};
+
+extern WebBrowser *TheWebBrowser;
+
+#endif // ZH_HAS_ATL
 #endif // __WEBBROWSER_H__

@@ -557,7 +557,8 @@ static void updateLadderDetails( Int selID, GameWindow *staticTextLadderName, Ga
 
 	// factions
 	AsciiStringList validFactions = info->validFactions;
-	for (AsciiStringListIterator it = validFactions.begin(); it != validFactions.end(); ++it)
+	AsciiStringListIterator it;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (it = validFactions.begin(); it != validFactions.end(); ++it)
 	{
 		AsciiString marker;
 		marker.format("INI:Faction%s", it->str());
@@ -576,7 +577,7 @@ static void updateLadderDetails( Int selID, GameWindow *staticTextLadderName, Ga
 
 	// maps
 	AsciiStringList validMaps = info->validMaps;
-	for (it = validMaps.begin(); it != validMaps.end(); ++it)
+	for (AsciiStringList::iterator it = validMaps.begin(); it != validMaps.end(); ++it)
 	{
 		const MapMetaData *md = TheMapCache->findMap(*it);
 		if (md)

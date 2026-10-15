@@ -45,6 +45,9 @@
 
 // FORWARD DECLARATIONS ///////////////////////////////////////////////////////////////////////////
 class Drawable;
+enum FilterTypes : int;	// defined in CommandXlat.h
+enum FilterModes : int;
+
 class ViewLocation;
 class Thing;
 class Waypoint;

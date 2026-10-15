@@ -167,7 +167,9 @@ ObjectID CountermeasuresBehavior::calculateCountermeasureToDivertTo( const Objec
 	//Start at the end of the list and go towards the beginning.
 	CountermeasuresVec::iterator it = m_counterMeasures.end();
 	//end is actually the end so advance the iterator.
-	if( it )
+	// (was "if( it )": with Visual C++ 6 a vector iterator was a raw pointer, NULL until the vector
+	// first allocated storage.  The intent is "if there are any countermeasures".)
+	if( !m_counterMeasures.empty() )
 	{
 		--it;
 		while( iteratorMax-- )
@@ -184,6 +186,11 @@ ObjectID CountermeasuresBehavior::calculateCountermeasureToDivertTo( const Objec
 			}
 			else
 			{
+				// The original stepped in front of begin() here when it ran out of elements:
+				// undefined behaviour that read whatever memory preceded the array (and so could
+				// differ between machines).  Stop at the first element instead.
+				if( it == m_counterMeasures.begin() )
+					break;
 				--it;
 			}
 		}

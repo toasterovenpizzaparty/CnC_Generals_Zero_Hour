@@ -14,11 +14,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 option(ZH_WARNINGS "Show compiler warnings (very noisy on this code base)" OFF)
+# Proprietary SDKs that are not part of the source release.  Turn on only if you have them.
+option(ZH_USE_MILES "Build the Miles Sound System audio backend (needs the Miles 6 SDK)" OFF)
+option(ZH_USE_BINK "Build the Bink video player (needs the Bink SDK)" OFF)
 
 set(ZH_CODE ${CMAKE_CURRENT_SOURCE_DIR})
 set(ZH_COMPAT ${ZH_CODE}/Compat)	# replacements for unavailable SDKs and pre-standard headers
 
-foreach(list wwdebug wwlib wwmath wwsaveload wwutil ww3d2 wwshade compression gameengine gameenginedevice rts)
+foreach(list wwdebug wwlib wwmath wwsaveload wwutil ww3d2 compression gameengine gameenginedevice rts)
     include(cmake/sources/${list}.cmake)
 endforeach()
 
@@ -28,9 +31,15 @@ endforeach()
 add_library(zh_options INTERFACE)
 target_compile_definitions(zh_options INTERFACE
     WIN32 _WINDOWS NDEBUG _RELEASE
-    WINVER=0x0601 _WIN32_WINNT=0x0601
-    _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
+    WINVER=0x0400 _WIN32_WINNT=0x0400 NOMINMAX	# as in the original .dsp files
+    _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE
+    ZH_USE_MILES=$<BOOL:${ZH_USE_MILES}> ZH_USE_BINK=$<BOOL:${ZH_USE_BINK}>)
 target_include_directories(zh_options INTERFACE ${ZH_COMPAT})
+if(MSVC)
+    target_compile_options(zh_options INTERFACE $<$<COMPILE_LANGUAGE:CXX>:/FI${ZH_COMPAT}/zh_compat_prefix.h>)
+else()
+    target_compile_options(zh_options INTERFACE $<$<COMPILE_LANGUAGE:CXX>:-include ${ZH_COMPAT}/zh_compat_prefix.h>)
+endif()
 
 if(MSVC)
     # /fp:precise is required for deterministic multiplayer - never use /fp:fast.
@@ -45,6 +54,8 @@ else()
     # Deterministic floating point: SSE2 everywhere (no x87 excess precision), no FMA contraction.
     target_compile_options(zh_options INTERFACE
         -fno-strict-aliasing -fwrapv -ffp-contract=off -fms-extensions
+        # sources are Windows-1252 encoded (MSVC reads them in the system code page)
+        -finput-charset=CP1252 -fexec-charset=CP1252
         $<$<COMPILE_LANGUAGE:CXX>:-fno-operator-names>)
     if(CMAKE_SIZEOF_VOID_P EQUAL 4)
         target_compile_options(zh_options INTERFACE -msse2 -mfpmath=sse)
@@ -79,7 +90,8 @@ zh_library(wwsaveload SOURCES ${WWSAVELOAD_SOURCES} INCLUDES ${WWV}/WWSaveLoad
 zh_library(wwutil SOURCES ${WWUTIL_SOURCES} INCLUDES ${WWV}/Wwutil DEFINES ${WW_DEFINES} LINK wwmath)
 zh_library(ww3d2 SOURCES ${WW3D2_SOURCES} INCLUDES ${WWV}/WW3D2 ${WWV}
     DEFINES ${WW_DEFINES} LINK wwsaveload wwmath wwlib d3dx8compat)
-zh_library(wwshade SOURCES ${WWSHADE_SOURCES} INCLUDES ${WWV}/wwshade DEFINES ${WW_DEFINES} LINK ww3d2)
+# wwshade is only used when USE_WWSHADE is defined, which the game never does (and its vertex
+# shaders need the proprietary NVASM assembler), so it is not built.
 
 # ------------------------------------------------------------------------------------------------
 # Replacements for SDKs that are not part of the source release (see Compat/README.md)
@@ -101,11 +113,19 @@ zh_library(gameengine SOURCES ${GAMEENGINE_SOURCES}
              ${ZH_CODE}/Libraries/Include ${WWV} ${ZH_CODE}/Libraries/Source/Compression
     DEFINES Z_PREFIX IG_DEBUG_STACKTRACE
     LINK compression wwlib wwmath zh_gamespy_stub zh_platform_stubs)
+# The original project used PreRTS.h as precompiled header (/Yu"PreRTS.h"); every .cpp includes it first.
+target_precompile_headers(gameengine PRIVATE ${ZH_CODE}/GameEngine/Include/Precompiled/PreRTS.h)
 
+if(NOT ZH_USE_MILES)
+    list(FILTER GAMEENGINEDEVICE_SOURCES EXCLUDE REGEX "MilesAudioDevice/")
+endif()
+if(NOT ZH_USE_BINK)
+    list(FILTER GAMEENGINEDEVICE_SOURCES EXCLUDE REGEX "VideoDevice/Bink/")
+endif()
 zh_library(gameenginedevice SOURCES ${GAMEENGINEDEVICE_SOURCES}
     INCLUDES ${ZH_CODE}/GameEngineDevice/Include ${ZH_CODE}/Main
     DEFINES IG_DEBUG_STACKTRACE
-    LINK gameengine ww3d2 wwshade wwsaveload wwutil zh_miles_stub zh_bink_stub)
+    LINK gameengine ww3d2 wwsaveload wwutil)
 
 add_executable(RTS WIN32 ${RTS_SOURCES})
 target_link_libraries(RTS PRIVATE gameenginedevice gameengine

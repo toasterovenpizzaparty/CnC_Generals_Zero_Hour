@@ -2054,7 +2054,8 @@ void Player::setUnitsShouldHunt(Bool unitsShouldHunt, CommandSourceType source)
 //=============================================================================
 void Player::killPlayer(void)
 {
-	for (PlayerTeamList::iterator it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it) {
+	PlayerTeamList::iterator it;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (it = m_playerTeamPrototypes.begin(); it != m_playerTeamPrototypes.end(); ++it) {
 		for (DLINK_ITERATOR<Team> iter = (*it)->iterate_TeamInstanceList(); !iter.done(); iter.advance()) {
 			Team *team = iter.cur();
 			if (!team) {
