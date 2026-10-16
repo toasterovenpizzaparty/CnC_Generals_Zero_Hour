@@ -512,7 +512,14 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 		}
 
 		if (setup.leaveSlot >= 0 && !players[setup.leaveSlot].left && net.now >= setup.leaveAtMs) {
-			players[setup.leaveSlot].session->leave();
+			// Like the game: the quit menu's self-destruct is issued in the same update as the leave.
+			Player &q = players[setup.leaveSlot];
+			uint32_t seq = ++q.seqCounter;
+			std::vector<uint8_t> cmd(8, 0xee);
+			memcpy(&cmd[0], &seq, 4);
+			q.issuedAtMs[seq] = net.now;
+			q.session->submitCommand(cmd);
+			q.session->leave();
 			players[setup.leaveSlot].left = true;
 		}
 		if (setup.crashSlot >= 0 && !players[setup.crashSlot].crashed && net.now >= setup.crashAtMs) {
@@ -661,6 +668,10 @@ static void TestLeave()
 	CHECK(sameFrame, "everyone saw 'player 2 left' on the same frame (%u)", players[0].leftEvents.empty() ? 0 : players[0].leftEvents[0].first);
 	CHECK(r.framesPlayed > 40 * 30 * 0.95, "the game went on at full speed (%d frames)", r.framesPlayed);
 	CHECK(!players[0].session->inGame(2) && players[0].session->inGame(1), "membership updated");
+	bool all = true;
+	for (std::map<uint32_t, double>::const_iterator it = players[2].issuedAtMs.begin(); it != players[2].issuedAtMs.end(); ++it)
+		if (!players[0].executed.count(std::make_pair(2, it->first)) || !players[1].executed.count(std::make_pair(2, it->first))) all = false;
+	CHECK(all, "its commands reached everyone, including the one issued as it left");
 }
 
 static void TestCrash()

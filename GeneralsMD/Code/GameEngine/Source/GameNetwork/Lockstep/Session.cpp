@@ -484,6 +484,7 @@ void Session::leave()
 			}
 		}
 	} else if (m_hostPeer != NO_PEER) {
+		clientSendCommands(m_nowMs);	// commands issued just before leaving (our self-destruct) go first
 		ByteWriter w;
 		w.u8(MSG_LEAVE);
 		sendToHost(CHANNEL_GAME, w);
