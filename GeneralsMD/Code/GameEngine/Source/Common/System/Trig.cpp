@@ -28,6 +28,7 @@
 // Converted to Generals by Matthew D. Campbell, February 2002
 
 #include "PreRTS.h"
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #include <math.h>
 #include <limits.h>
@@ -1640,7 +1641,7 @@ static Int intTan( Int angle )
 Real Sin(Real x)
 {
 #ifdef DEFAULT_TRIG
-	return sinf(x);
+	return DetMath::Sinf(x);
 #else
 	return (Real)intSin((Int)((x) * INT_ONE)) / (Real)INT_ONE;
 #endif
@@ -1649,7 +1650,7 @@ Real Sin(Real x)
 Real Cos(Real x)
 {
 #ifdef DEFAULT_TRIG
-	return cosf(x);
+	return DetMath::Cosf(x);
 #else
 	return (Real)intCos((Int)((x) * INT_ONE)) / (Real)INT_ONE;
 #endif
@@ -1658,7 +1659,7 @@ Real Cos(Real x)
 Real Tan(Real x)
 {
 #ifdef DEFAULT_TRIG
-	return tanf(x);
+	return DetMath::Tanf(x);
 #else
 	return (Real)intTan((Int)((x) * INT_ONE)) / (Real)INT_ONE;
 #endif
@@ -1667,7 +1668,7 @@ Real Tan(Real x)
 Real ACos(Real x)
 {
 #ifdef DEFAULT_TRIG
-	return acosf(x);
+	return DetMath::Acosf(x);
 #else
 	return (Real)(intArcCos((Int)((x) * INT_ONE))) * TWOPI / (Real)INT_TWOPI;
 #endif
@@ -1675,7 +1676,7 @@ Real ACos(Real x)
 
 Real ASin(Real x)
 {
-	return asinf(x);
+	return DetMath::Asinf(x);
 }
 
 #ifdef REGENERATE_TRIG_TABLES
@@ -1697,7 +1698,7 @@ void initTrig( void )
 	fprintf(fp, "static Int sinLookup[TRIG_RES] = {\n");
 	for( i=0; i<TRIG_RES; i++ ) {
 		angle = TWOPI * i / (Real)TRIG_RES;
-		sinLookup[i] = (Int)(sin(angle) * INT_ONE);
+		sinLookup[i] = (Int)(DetMath::Sin(angle) * INT_ONE);
 
 		if (i == 0)
 		{
@@ -1720,7 +1721,7 @@ void initTrig( void )
 	for( i=0; i<2*INT_ONE; i++ ) {
 		r = (Real)i / (Real)INT_ONE - 1.0f;
 
-		arcCosLookup[i] = (Int)(acos( (double)r ) * INT_TWOPI / TWOPI );
+		arcCosLookup[i] = (Int)(DetMath::Acos( (double)r ) * INT_TWOPI / TWOPI );
 
 		if (i == 0)
 		{

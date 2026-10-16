@@ -29,6 +29,10 @@
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 
+#if defined(_M_X64) || (defined(_M_IX86_FP) && (_M_IX86_FP >= 1))
+#include <xmmintrin.h>	// _mm_getcsr / _mm_setcsr, see setFPMode
+#endif
+
 #include "Common/AudioAffect.h"
 #include "Common/AudioHandleSpecialValues.h"
 #include "Common/BuildAssistant.h"
@@ -197,15 +201,14 @@ static Waypoint * findNamedWaypoint(AsciiString name)
 // ------------------------------------------------------------------------------------------------
 void setFPMode( void )
 {
-  // Set floating point round mode to CHOP, which only comes
-  // into play when precision is exceeded.  This is necessary
-  // for the fast float to int routines used elsewhere in the
-  // system.
-	//
-	// Also set floating point precision to low.  It could be
-	// anything as long as it is consistent, really, but this
-	// is in the (vain?) hope of any slight speed boost.
-	//
+	// Every machine in a multiplayer game must evaluate the simulation's floating point math in
+	// exactly the same mode, otherwise results drift apart and the game ends in a CRC mismatch.
+	// Graphics drivers, overlays and other DLLs are free to change these modes behind our back, so
+	// this is re-applied at the start of every logic frame (and around DirectX calls).
+
+#if defined(_M_IX86)
+	// x87 FPU (32-bit builds): round to nearest, 24 bit precision.  The precision value itself is
+	// arbitrary - what matters is that it is the same everywhere.  _MCW_PC is not supported on x64.
 	_fpreset();
 
 	UnsignedInt curVal = _statusfp();
@@ -215,6 +218,23 @@ void setFPMode( void )
 	newVal = (newVal & ~_MCW_PC) | (_PC_24   & _MCW_PC);
 
 	_controlfp(newVal, _MCW_PC | _MCW_RC);
+#endif
+
+#if defined(_M_X64) || (defined(_M_IX86_FP) && (_M_IX86_FP >= 1))
+	// SSE (all x64 code, and 32-bit builds using /arch:SSE or /arch:SSE2): the MXCSR register has
+	// its own rounding mode and flush-to-zero / denormals-are-zero switches, which some drivers turn
+	// on.  Force round to nearest, full denormal support and all exceptions masked.
+	{
+		const UnsignedInt MXCSR_EXCEPTION_MASKS			= 0x1F80;
+		const UnsignedInt MXCSR_ROUNDING_MODE				= 0x6000;	// 00 = round to nearest
+		const UnsignedInt MXCSR_FLUSH_TO_ZERO				= 0x8000;
+		const UnsignedInt MXCSR_DENORMALS_ARE_ZERO	= 0x0040;
+		UnsignedInt csr = _mm_getcsr();
+		csr &= ~(MXCSR_ROUNDING_MODE | MXCSR_FLUSH_TO_ZERO | MXCSR_DENORMALS_ARE_ZERO);
+		csr |= MXCSR_EXCEPTION_MASKS;
+		_mm_setcsr(csr);
+	}
+#endif
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -2601,6 +2621,22 @@ void GameLogic::processCommandList( CommandList *list )
 			}
 #endif DEBUG_LOGGING
 			TheNetwork->setSawCRCMismatch();
+
+			// Every machine reaches this point on the same logic frame.  Write this machine's complete
+			// simulation state so the files from all players can be compared to find exactly which
+			// object diverged first (see Tests/Determinism/compare_desync_dumps.py).
+			AsciiString dumpName;
+			dumpName.format("%sDesync_frame%d_player%d.crc", TheGlobalData->getPath_UserData().str(),
+				m_frame, TheNetwork->getLocalPlayerID());
+			try
+			{
+				getCRC(CRC_RECALC, dumpName);
+				DEBUG_LOG(("CRC Mismatch - wrote simulation state to %s\n", dumpName.str()));
+			}
+			catch (...)
+			{
+				DEBUG_LOG(("CRC Mismatch - could not write %s\n", dumpName.str()));
+			}
 		}
 	}
 

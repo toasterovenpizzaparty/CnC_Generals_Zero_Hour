@@ -39,6 +39,7 @@
 #include "GameNetwork/NetworkInterface.h"
 #include "GameNetwork/Udp.h"
 #include "GameNetwork/Transport.h"
+#include "GameNetwork/NetworkTiming.h"
 #include "strtok_r.h"
 #include "GameClient/Shell.h"
 #include "Common/CRCDebug.h"
@@ -644,15 +645,11 @@ void Network::processFrameSynchronizedNetCommand(NetCommandRef *msg) {
 void Network::processRunAheadCommand(NetRunAheadCommandMsg *msg) {
 	m_runAhead = msg->getRunAhead();
 	m_frameRate = msg->getFrameRate();
-	time_t frameGrouping = (1000 * m_runAhead) / m_frameRate; // number of miliseconds between packet sends
-	frameGrouping = frameGrouping / 2; // since we only want the latency for one way to be a factor.
-//	DEBUG_LOG(("Network::processRunAheadCommand - trying to set frame grouping to %d.  run ahead = %d, m_frameRate = %d\n", frameGrouping, m_runAhead, m_frameRate));
-	if (frameGrouping < 1) {
-		frameGrouping = 1; // Having a value less than 1 doesn't make sense.
-	}
-	if (frameGrouping > 500) {
-		frameGrouping = 500; // Max of a half a second.
-	}
+	// Minimum time between packet flushes.  This used to be half the run-ahead window (166 ms at the
+	// minimum run-ahead, up to 500 ms), so a command could spend most of its time budget waiting to
+	// leave the machine.  Bandwidth is not a concern any more: flush a couple of times per logic frame.
+	time_t frameGrouping = ComputeFrameGroupingMs(m_frameRate);
+//	DEBUG_LOG(("Network::processRunAheadCommand - setting frame grouping to %d.  run ahead = %d, m_frameRate = %d\n", frameGrouping, m_runAhead, m_frameRate));
 	m_conMgr->setFrameGrouping(frameGrouping);
 }
 

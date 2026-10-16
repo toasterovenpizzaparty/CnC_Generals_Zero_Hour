@@ -32,6 +32,8 @@
 #include "Lib/BaseType.h"
 #include "GameNetwork/NetworkDefs.h"
 
+#include "GameNetwork/NetworkTiming.h"
+
 class FrameMetrics {
 public:
 	FrameMetrics();
@@ -45,6 +47,7 @@ public:
 	void addCushion(Int cushion);
 
 	Real getAverageLatency();
+	Real getRunAheadLatency();		///< round trip (seconds) to plan the run-ahead with: smoothed RTT plus jitter margin
 	Int getAverageFPS();
 	Int getMinimumCushion();
 
@@ -61,6 +64,7 @@ protected:
 	// The index used should be the frame number mod the array length.
 	Real *m_latencyList;				///< A record of the round trip latencies of the frame info packets to the packet router.  Values in seconds.
 	time_t *m_pendingLatencies;																///< The latencies of frame info packets that are "in the air."
+	RttEstimator m_latencyEstimator;																	///< Smoothed RTT + variation of the same samples, in milliseconds.
 	Real m_averageLatency;																		///< The current average latency, this is used to save calculation time.
 																														///< When a new latency value is received, the old one is subtracted out and the new
 																														///< one is added in.

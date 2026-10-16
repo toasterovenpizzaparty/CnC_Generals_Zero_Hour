@@ -44,6 +44,7 @@
 
 #include "always.h"
 #include <math.h>
+#include "detmath.h"
 #include <float.h>
 #include <assert.h>
 #include <float.h>
@@ -146,8 +147,8 @@ static WWINLINE float Fast_Asin(float val);
 static WWINLINE float Asin(float val);
 
 
-static float		Atan(float x) { return static_cast<float>(atan(x)); }
-static float		Atan2(float y,float x) { return static_cast<float>(atan2(y,x)); }
+static float		Atan(float x) { return static_cast<float>(DetMath::Atan(x)); }
+static float		Atan2(float y,float x) { return static_cast<float>(DetMath::Atan2(y,x)); }
 static float		Sign(float val);
 static float		Ceil(float val) { return ceilf(val); }
 static float		Floor(float val) { return floorf(val); }
@@ -341,45 +342,23 @@ WWINLINE long WWMath::Float_To_Long(double f)
 // Cos
 // ----------------------------------------------------------------------------
 
-#if defined(_MSC_VER) && defined(_M_IX86)
+// Note: this used the x87 FCOS instruction, whose results differ between CPU vendors and
+// generations - a source of multiplayer desyncs.  DetMath gives the same bits on every machine.
 WWINLINE float WWMath::Cos(float val)
 {
-	float retval;
-	__asm {
-		fld [val]
-		fcos
-		fstp [retval]
-	}
-	return retval;
+	return DetMath::Cosf(val);
 }
-#else
-WWINLINE float WWMath::Cos(float val)
-{
-	return cosf(val);
-}
-#endif
 
 // ----------------------------------------------------------------------------
 // Sin
 // ----------------------------------------------------------------------------
 
-#if defined(_MSC_VER) && defined(_M_IX86)
+// Note: this used the x87 FSIN instruction, whose results differ between CPU vendors and
+// generations - a source of multiplayer desyncs.  DetMath gives the same bits on every machine.
 WWINLINE float WWMath::Sin(float val)
 {
-	float retval;
-	__asm {
-		fld [val]
-		fsin
-		fstp [retval]
-	}
-	return retval;
+	return DetMath::Sinf(val);
 }
-#else
-WWINLINE float WWMath::Sin(float val)
-{
-	return sinf(val);
-}
-#endif
 
 // ----------------------------------------------------------------------------
 // Fast, table based sin
@@ -509,7 +488,7 @@ WWINLINE float WWMath::Fast_Acos(float val)
 
 WWINLINE float WWMath::Acos(float val)
 {
-	return (float)acos(val);
+	return (float)DetMath::Acos(val);
 }
 
 // ----------------------------------------------------------------------------
@@ -546,7 +525,7 @@ WWINLINE float WWMath::Fast_Asin(float val)
 
 WWINLINE float WWMath::Asin(float val)
 {
-	return (float)asin(val);
+	return (float)DetMath::Asin(val);
 }
 
 // ----------------------------------------------------------------------------

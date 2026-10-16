@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 2002
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 
 #include "Common/GameMemory.h"
@@ -678,8 +679,8 @@ void AISkirmishPlayer::buildAIBaseDefenseStructure(const AsciiString &thingName,
 		}
 
 		if (angle > PI/3) break;
-		Real s = sin(angle);
-		Real c = cos(angle);
+		Real s = DetMath::Sin(angle);
+		Real c = DetMath::Cos(angle);
 
 	  DEBUG_LOG(("buildAIBaseDefenseStructure -- Angle is %f sin %f, cos %f \n", 180*angle/PI, s, c));
 		DEBUG_LOG(("buildAIBaseDefenseStructure -- Offset is %f  %f, Final Position is %f, %f \n", 
@@ -1041,8 +1042,8 @@ void AISkirmishPlayer::adjustBuildList(BuildListInfo *list)
 	
 	angle += 3*PI/4;
 
-	Real s = sin(angle);
-	Real c = cos(angle);
+	Real s = DetMath::Sin(angle);
+	Real c = DetMath::Cos(angle);
 
 	cur = list;
 	while (cur) {

@@ -27,6 +27,7 @@
 // Desc:   
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #include "Common/BezierSegment.h"
 #include "Common/GameCommon.h"
@@ -177,7 +178,7 @@ static Bool calcTrajectory(
 	Real dz = end.z - start.z;
 
 	// calculating the angle is trivial.
-	angle = atan2(dy, dx);
+	angle = DetMath::Atan2(dy, dx);
 
 	// calculating the pitch requires a bit more effort.
 	Real horizDistSqr = sqr(dx) + sqr(dy);
@@ -190,7 +191,7 @@ static Bool calcTrajectory(
 
 	// let's start by aiming directly for it. we know this isn't right (unless gravity
 	// is zero, which it's not) but is a good starting point...
-	Real theta = atan2(dz, horizDist);
+	Real theta = DetMath::Atan2(dz, horizDist);
 	// if the angle isn't pretty shallow, we can get a better initial guess by using
 	// the code below...
 	const Real SHALLOW_ANGLE = 0.5f * PI / 180.0f;

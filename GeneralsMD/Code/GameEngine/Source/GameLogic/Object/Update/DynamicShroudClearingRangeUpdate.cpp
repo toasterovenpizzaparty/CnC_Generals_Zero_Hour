@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 #include "Common/Xfer.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/Object.h"
@@ -171,8 +172,8 @@ void DynamicShroudClearingRangeUpdate::animateGridDecals( void )
 
 	for (int d = 0; d < GRID_FX_DECAL_COUNT; ++d)
 	{
-		pos.x = ctr->x + (sinf(angle) * radius);
-		pos.y = ctr->y + (cosf(angle) * radius);
+		pos.x = ctr->x + (DetMath::Sinf(angle) * radius);
+		pos.y = ctr->y + (DetMath::Cosf(angle) * radius);
 
 		pos.x -= ((Int)pos.x)%23;
 		pos.y -= ((Int)pos.y)%23;

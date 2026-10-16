@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #include "Common/ThingTemplate.h"
 #include "Common/ThingFactory.h"
@@ -188,7 +189,7 @@ void ToppleUpdate::applyTopplingForce( const Coord3D* toppleDirection, Real topp
 	// yeah, it assumes the models are constructed appropriately, but is a cheap way
 	// of minimizing the problem. (srj)
 	Real curAngleX = normalizeAngle(getObject()->getOrientation());
-	Real toppleAngle = normalizeAngle(atan2(m_toppleDirection.y, m_toppleDirection.x));
+	Real toppleAngle = normalizeAngle(DetMath::Atan2(m_toppleDirection.y, m_toppleDirection.x));
 	if (d->m_toppleLeftOrRightOnly)
 	{
 		// it's a fence or such, and can only topple left or right, so pick the closest

@@ -29,6 +29,7 @@
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #include "Common/Xfer.h"
 #include "GameLogic/Object.h"
@@ -124,8 +125,8 @@ UpdateSleepTime FloatUpdate::update( void )
 	{
 
 		Real angle = INT_TO_REAL(TheGameLogic->getFrame());
-		Real yaw = sin(angle * 0.0291f) * 0.05f;
-		Real pitch = sin(angle * 0.0515f) * 0.05f;
+		Real yaw = DetMath::Sin(angle * 0.0291f) * 0.05f;
+		Real pitch = DetMath::Sin(angle * 0.0515f) * 0.05f;
 
 		Matrix3D mx = *draw->getInstanceMatrix();
 

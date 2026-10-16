@@ -27,6 +27,7 @@
 // Author: Michael S. Booth, January 1998
 
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 
 #include "Lib/BaseType.h"
@@ -51,7 +52,7 @@
 //#define DEBUG_RANDOM_LOGIC
 //#define DEBUG_RANDOM_AUDIO
 
-static const Real theMultFactor = 1.0f / (powf(2, 8 * sizeof(UnsignedInt)) - 1.0f);
+static const Real theMultFactor = 1.0f / (DetMath::Powf(2, 8 * sizeof(UnsignedInt)) - 1.0f);
 
 // Initial seed values.
 static UnsignedInt theGameClientSeed[6] =

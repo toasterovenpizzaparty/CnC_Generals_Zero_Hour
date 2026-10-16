@@ -38,20 +38,13 @@ Connection::Connection() {
 	m_transport = NULL;
 	m_user = NULL;
 	m_netCommandList = NULL;
-	m_retryTime = 2000; // set retry time to 2 seconds.
+	m_retryTime = NET_RTO_INITIAL_MS; // adapted from the measured round trip once acks come in (was a fixed 2 seconds)
 	m_lastTimeSent = 0;
 	m_frameGrouping = 1;
 	m_isQuitting = false;
 	m_quitTime = 0;
-	// Added By Sadullah Nader
-	// clearing out the latency tracker
-	m_averageLatency = 0.0f;
-	Int i;
-	for(i = 0; i < CONNECTION_LATENCY_HISTORY_LENGTH; i++)
-	{
-		m_latencies[i] = 0.0f;
-	}
-	// End Add
+	m_numRetries = 0;
+	m_rttEstimator.reset();
 }
 
 /**
@@ -89,12 +82,8 @@ void Connection::init() {
 	m_lastTimeSent = 0;
 	m_frameGrouping = 1;
 	m_numRetries = 0;
-	m_retryMetricsTime = 0;
-
-	for (Int i = 0; i < CONNECTION_LATENCY_HISTORY_LENGTH; ++i) {
-		m_latencies[i] = 0;
-	}
-	m_averageLatency = 0;
+	m_retryTime = NET_RTO_INITIAL_MS;
+	m_rttEstimator.reset();
 	m_isQuitting = FALSE;
 	m_quitTime = 0;
 }
@@ -272,7 +261,11 @@ UnsignedInt Connection::doSend() {
 		return 0;
 	}
 
-	if ((curtime - m_lastTimeSent) < m_frameGrouping) {
+	// Batch outgoing commands into as few packets as possible, but never hold back an ack: the
+	// sender's retransmission timer and the run-ahead latency measurement both depend on acks
+	// coming back promptly.  (Originally acks waited for the full frame grouping, which inflated
+	// the measured latency, which raised the run-ahead, which raised the frame grouping...)
+	if (((curtime - m_lastTimeSent) < m_frameGrouping) && !hasUnsentAck()) {
 //		DEBUG_LOG(("not sending packet, time = %d, m_lastFrameSent = %d, m_frameGrouping = %d\n", curtime, m_lastTimeSent, m_frameGrouping));
 		return 0;
 	}
@@ -285,28 +278,33 @@ UnsignedInt Connection::doSend() {
 		packet->init();
 		packet->setAddress(m_user->GetIPAddr(), m_user->GetPort());
 
-		Bool notDone = TRUE;
-
 		// add the command messages until either we run out of messages or the packet is full.
-		while ((msg != NULL) && notDone) {
+		while (msg != NULL) {
 			NetCommandRef *next = msg->getNext(); // Need this since msg could be deleted
 
-			time_t timeLastSent = msg->getTimeLastSent();
-
-			if (((curtime - timeLastSent) > m_retryTime) || (timeLastSent == -1)) {
-				notDone = packet->addCommand(msg);
-				if (notDone) {
-					// the msg command was added to the packet.
-					if (CommandRequiresAck(msg->getCommand())) {
-						if (timeLastSent != -1) {
-							++m_numRetries;
-						}
-						doRetryMetrics();
-						msg->setTimeLastSent(curtime);
-					} else {
-						m_netCommandList->removeMessage(msg);
-						msg->deleteInstance();
+			if (isDueForSend(msg, curtime)) {
+				if (!packet->addCommand(msg)) {
+					if (packet->getNumCommands() == 0) {
+						// Doesn't even fit in an empty packet.  Big commands are split into wrapper
+						// commands before they get here, so this shouldn't happen; skip it rather than
+						// looping forever.
+						DEBUG_CRASH(("Connection::doSend - command of type %d does not fit in an empty packet", msg->getCommand()->getNetCommandType()));
+						msg = next;
 					}
+					// The packet is full: msg starts the next packet.  (The original code skipped msg
+					// here, delaying it by a whole frame grouping or retry period.)
+					break;
+				}
+
+				// the msg command was added to the packet.
+				if (CommandRequiresAck(msg->getCommand())) {
+					if (msg->getNumSends() > 0) {
+						++m_numRetries;
+					}
+					msg->markSent(curtime);
+				} else {
+					m_netCommandList->removeMessage(msg);
+					msg->deleteInstance();
 				}
 			}
 			msg = next;
@@ -378,11 +376,14 @@ NetCommandRef * Connection::processAck(UnsignedShort commandID, UnsignedByte ori
 	}
 #endif
 
-	Int index = temp->getCommand()->getID() % CONNECTION_LATENCY_HISTORY_LENGTH;
-	m_averageLatency -= ((Real)(m_latencies[index])) / CONNECTION_LATENCY_HISTORY_LENGTH;
-	Real lat = timeGetTime() - temp->getTimeLastSent();
-	m_averageLatency += lat / CONNECTION_LATENCY_HISTORY_LENGTH;
-	m_latencies[index] = lat;
+	// Measure the round trip and adapt the retransmission timeout (Karn's algorithm: commands that
+	// were retransmitted after a timeout give ambiguous samples and are ignored).
+	Bool redundant = IsCommandSynchronized(temp->getCommand()->getNetCommandType());
+	if ((temp->getTimeFirstSent() != -1) && ShouldSampleRtt(temp->getNumSends(), redundant)) {
+		Real rtt = (Real)(timeGetTime() - temp->getTimeFirstSent());
+		m_rttEstimator.addSample(rtt);
+		m_retryTime = (time_t)m_rttEstimator.getRetransmitTimeout();
+	}
 
 #if defined(_DEBUG) || defined(_INTERNAL)
 	if (doDebug == TRUE) {
@@ -395,20 +396,39 @@ NetCommandRef * Connection::processAck(UnsignedShort commandID, UnsignedByte ori
 
 void Connection::setFrameGrouping(time_t frameGrouping) {
 	m_frameGrouping = frameGrouping;
-//	m_retryTime = frameGrouping * 4;
 }
 
-void Connection::doRetryMetrics() {
-	static Int numSeconds = 0;
-	time_t curTime = timeGetTime();
-
-	if ((curTime - m_retryMetricsTime) > 10000) {
-		m_retryMetricsTime = curTime;
-		++numSeconds;
-//		DEBUG_LOG(("Retries in the last 10 seconds = %d, average latency = %fms\n", m_numRetries, m_averageLatency));
-		m_numRetries = 0;
-//		m_retryTime = m_averageLatency * 1.5;
+/**
+ * Returns TRUE if an ack is queued that hasn't been sent yet.  Acks bypass the frame grouping delay.
+ */
+Bool Connection::hasUnsentAck() {
+	NetCommandRef *ref = m_netCommandList->getFirstMessage();
+	while (ref != NULL) {
+		NetCommandType type = ref->getCommand()->getNetCommandType();
+		if ((ref->getNumSends() == 0) &&
+				((type == NETCOMMANDTYPE_ACKBOTH) || (type == NETCOMMANDTYPE_ACKSTAGE1) || (type == NETCOMMANDTYPE_ACKSTAGE2))) {
+			return TRUE;
+		}
+		ref = ref->getNext();
 	}
+	return FALSE;
+}
+
+/**
+ * Decide whether a queued command goes into the packet being built.
+ * - never sent: always.
+ * - synchronized commands (frame info, game commands, run ahead, ...): repeated in the next couple
+ *   of flushes until acked, so one lost packet costs ~one flush interval instead of a timeout.
+ *   The receiver already discards duplicates of these types.
+ * - everything else: retransmitted after the adaptive timeout, with capped exponential backoff.
+ */
+Bool Connection::isDueForSend(NetCommandRef *msg, time_t curtime) {
+	if (msg->getNumSends() == 0) {
+		return TRUE;
+	}
+	Bool redundant = IsCommandSynchronized(msg->getCommand()->getNetCommandType());
+	UnsignedInt interval = ComputeRetryInterval((UnsignedInt)m_retryTime, (UnsignedInt)m_frameGrouping, msg->getNumSends(), redundant);
+	return ((curtime - msg->getTimeLastSent()) >= (time_t)interval);
 }
 
 #if defined(_DEBUG) || (_INTERNAL)

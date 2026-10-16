@@ -70,6 +70,7 @@ FrameMetrics::~FrameMetrics() {
 void FrameMetrics::init() {
 	m_averageFps = 30;
 	m_averageLatency = (Real)0.2;
+	m_latencyEstimator.reset();
 	m_minimumCushion = -1;
 
 	for (Int i = 0; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
@@ -118,6 +119,8 @@ void FrameMetrics::processLatencyResponse(UnsignedInt frame) {
 	m_latencyList[latencyListIndex] = (Real)timeDiff / (Real)1000; // convert to seconds from milliseconds.
 	m_averageLatency += m_latencyList[latencyListIndex] / TheGlobalData->m_networkLatencyHistoryLength;
 
+	m_latencyEstimator.addSample((Real)timeDiff);
+
 	if (frame % 16 == 0) {
 //		DEBUG_LOG(("ConnectionManager::processFrameInfoAck - average latency = %f\n", m_averageLatency));
 	}
@@ -140,6 +143,18 @@ Int FrameMetrics::getAverageFPS() {
 
 Real FrameMetrics::getAverageLatency() {
 	return m_averageLatency;
+}
+
+/**
+ * The latency to base the run-ahead on.  The plain average hides jitter: on Wi-Fi a good share of
+ * packets arrive well after the average, and every one of those stalls the game.  Use the smoothed
+ * round trip plus a multiple of its variation instead (seconds, like getAverageLatency).
+ */
+Real FrameMetrics::getRunAheadLatency() {
+	if (!m_latencyEstimator.hasSample()) {
+		return m_averageLatency;
+	}
+	return m_latencyEstimator.getConservativeRtt((Real)NET_JITTER_MULTIPLIER) / (Real)1000.0;
 }
 
 Int FrameMetrics::getMinimumCushion() {

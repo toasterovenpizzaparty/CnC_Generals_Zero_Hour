@@ -28,7 +28,7 @@
 #include "GameNetwork/NetworkUtil.h"
 
 Int MAX_FRAMES_AHEAD = 128;
-Int MIN_RUNAHEAD = 10;
+Int MIN_RUNAHEAD = 6;		// was 10 (333 ms of input delay even on a LAN); the run-ahead now grows with measured latency + jitter
 Int FRAME_DATA_LENGTH = (MAX_FRAMES_AHEAD+1)*2;
 Int FRAMES_TO_KEEP = (MAX_FRAMES_AHEAD/2) + 1;
 

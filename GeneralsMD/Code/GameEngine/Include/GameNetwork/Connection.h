@@ -42,8 +42,7 @@
 #include "GameNetwork/User.h"
 #include "GameNetwork/transport.h"
 #include "GameNetwork/NetPacket.h"
-
-#define CONNECTION_LATENCY_HISTORY_LENGTH 200
+#include "GameNetwork/NetworkTiming.h"
 
 class Connection : public MemoryPoolObject
 {
@@ -84,7 +83,8 @@ public:
 #endif
 
 protected:
-	void doRetryMetrics();
+	Bool hasUnsentAck();																					///< TRUE if an ack is waiting to go out
+	Bool isDueForSend(NetCommandRef *msg, time_t curtime);					///< TRUE if msg should go into the next packet
 
 	Bool m_isQuitting;
 	UnsignedInt m_quitTime;
@@ -93,14 +93,12 @@ protected:
 	User *m_user;
 
 	NetCommandList *m_netCommandList;
-	time_t m_retryTime;						///< The time between sending retry packets for this connection.  Time is in milliseconds.
-	Real m_averageLatency;			///< The average time between sending a command and receiving an ACK.
-	Real m_latencies[CONNECTION_LATENCY_HISTORY_LENGTH];	///< List of the last 100 latencies.
+	time_t m_retryTime;						///< Current retransmission timeout for this connection, adapted from the measured round trip.  Milliseconds.
+	RttEstimator m_rttEstimator;	///< Smoothed round trip time and variation, measured from acks.
 
 	time_t m_frameGrouping;				///< The minimum time between packet sends.
 	time_t m_lastTimeSent;				///< The time of the last packet send.
-	Int m_numRetries;							///< The number of retries for the last second.
-	time_t m_retryMetricsTime;		///< The start time of the current retry metrics thing.
+	Int m_numRetries;							///< Number of retransmissions on this connection (statistics only).
 };
 
 #endif

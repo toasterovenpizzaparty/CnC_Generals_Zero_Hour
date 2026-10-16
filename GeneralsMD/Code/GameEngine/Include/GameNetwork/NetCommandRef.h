@@ -64,6 +64,9 @@ public:
 
 	time_t getTimeLastSent() const;
 	void setTimeLastSent(time_t timeLastSent);
+	time_t getTimeFirstSent() const;
+	Int getNumSends() const;
+	void markSent(time_t now);					///< record a (re)transmission of this command at time now
 
 protected:
 	NetCommandMsg *m_msg;
@@ -71,6 +74,8 @@ protected:
 	NetCommandRef *m_prev;
 	UnsignedByte m_relay; ///< Need this in the command reference since the relay value will be different depending on where this particular reference is being sent.
 	time_t m_timeLastSent;
+	time_t m_timeFirstSent;		///< time of the first transmission, -1 if never sent
+	Int m_numSends;						///< number of times this reference has been transmitted
 
 #ifdef DEBUG_NETCOMMANDREF
 	UnsignedInt m_id;
@@ -131,6 +136,35 @@ inline time_t NetCommandRef::getTimeLastSent() const
 inline void NetCommandRef::setTimeLastSent(time_t timeLastSent) 
 {
 	m_timeLastSent = timeLastSent;
+}
+
+/**
+ * Return the time this command was first sent from this reference, -1 if never.
+ */
+inline time_t NetCommandRef::getTimeFirstSent() const
+{
+	return m_timeFirstSent;
+}
+
+/**
+ * Return how many times this command has been sent from this reference.
+ */
+inline Int NetCommandRef::getNumSends() const
+{
+	return m_numSends;
+}
+
+/**
+ * Record that this command was (re)sent at the given time.
+ */
+inline void NetCommandRef::markSent(time_t now)
+{
+	if (m_numSends == 0)
+	{
+		m_timeFirstSent = now;
+	}
+	++m_numSends;
+	m_timeLastSent = now;
 }
 
 /**

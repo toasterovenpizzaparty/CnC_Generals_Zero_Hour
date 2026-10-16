@@ -235,7 +235,11 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 #if defined(_DEBUG) || defined(_INTERNAL)
 			if (TheGlobalData->m_netMinPlayers > 0) {
 #endif
-/*			if (msg->GameToJoin.iniCRC != TheGlobalData->m_iniCRC ||
+			// Refuse players whose executable or game data differs from ours.  This check was commented
+			// out in the shipped code, so machines with a different patch, mod or edited INI files could
+			// join and would then desync ("mismatch") as soon as the difference mattered.  The CRCs
+			// cover the exe, the version number, the multiplayer scripts and every INI file loaded.
+			if (msg->GameToJoin.iniCRC != TheGlobalData->m_iniCRC ||
 					msg->GameToJoin.exeCRC != TheGlobalData->m_exeCRC)
 			{
 				DEBUG_LOG(("LANAPI::handleRequestJoin - join denied because of CRC mismatch. CRCs are them/us INI:%X/%X exe:%X/%X\n",
@@ -247,7 +251,7 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 				reply.GameNotJoined.playerIP = senderIP;
 				canJoin = false;
 			}
-*/
+
 #if defined(_DEBUG) || defined(_INTERNAL)
 			}
 #endif

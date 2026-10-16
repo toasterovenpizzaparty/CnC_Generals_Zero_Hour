@@ -48,6 +48,7 @@
 //         Includes                                                      
 //-----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
+#include "WWMath/detmath.h"	// deterministic sin/cos/atan2/... for the simulation
 
 #include "Common/ActionManager.h"
 #include "Common/DiscreteCircle.h"
@@ -5682,7 +5683,7 @@ static void hLineAddThreat(Int x1, Int x2, Int y, void *threatValueParms)
 		if (x < 0 || x >= ThePartitionManager->m_cellCountX)
 			continue;
 
-		distance = sqrt( pow(x - parms->xCenter, 2) + pow(y - parms->yCenter, 2) );
+		distance = sqrt( DetMath::Pow(x - parms->xCenter, 2) + DetMath::Pow(y - parms->yCenter, 2) );
 		mulVal = 1 - distance / parms->radius;
 		if (mulVal < 0.0f) 
 			mulVal = 0.0f;
@@ -5710,7 +5711,7 @@ static void hLineRemoveThreat(Int x1, Int x2, Int y, void *threatValueParms)
 		if (x < 0 || x >= ThePartitionManager->m_cellCountX)
 			continue;
 
-		distance = sqrt( pow(x - parms->xCenter, 2) + pow(y - parms->yCenter, 2) );
+		distance = sqrt( DetMath::Pow(x - parms->xCenter, 2) + DetMath::Pow(y - parms->yCenter, 2) );
 		mulVal = 1 - distance / parms->radius;
 		if (mulVal < 0.0f) 
 			mulVal = 0.0f;
@@ -5738,7 +5739,7 @@ static void hLineAddValue(Int x1, Int x2, Int y, void *threatValueParms)
 		if (x < 0 || x >= ThePartitionManager->m_cellCountX)
 			continue;
 
-		distance = sqrt( pow(x - parms->xCenter, 2) + pow(y - parms->yCenter, 2) );
+		distance = sqrt( DetMath::Pow(x - parms->xCenter, 2) + DetMath::Pow(y - parms->yCenter, 2) );
 		mulVal = 1 - distance / parms->radius;
 		if (mulVal < 0.0f) 
 			mulVal = 0.0f;
@@ -5766,7 +5767,7 @@ static void hLineRemoveValue(Int x1, Int x2, Int y, void *threatValueParms)
 		if (x < 0 || x >= ThePartitionManager->m_cellCountX)
 			continue;
 
-		distance = sqrt( pow(x - parms->xCenter, 2) + pow(y - parms->yCenter, 2) );
+		distance = sqrt( DetMath::Pow(x - parms->xCenter, 2) + DetMath::Pow(y - parms->yCenter, 2) );
 		mulVal = 1 - distance / parms->radius;
 		if (mulVal < 0.0f) 
 			mulVal = 0.0f;
