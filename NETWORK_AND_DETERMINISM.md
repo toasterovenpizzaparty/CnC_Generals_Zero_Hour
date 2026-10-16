@@ -4,44 +4,74 @@ This is a modified version of the EA source release. These changes target two mu
 problems: the game **stalls/stutters** on Wi-Fi and internet links, and it **desyncs**
 ("The game has detected a mismatch") between machines.
 
-The packet format is unchanged. However, every player in a game must run the same new build, and
-the re-enabled LAN version check (below) enforces this.
+Every player in a game must run the same build. The re-enabled LAN version check enforces this,
+and so does the new network's handshake.
 
 Only the Zero Hour tree (`GeneralsMD/`) is changed. The same files exist under `Generals/` and
 need the same edits if you also want them for the base game.
 
-## Part 1: stalls and stutters
+## Part 1: stalls and stutters: a new LAN network layer
 
-The game uses deterministic lockstep: frame *N* cannot run until every player's commands for
-frame *N* have arrived. Any late packet therefore freezes **all** players. The original timing
-code made late packets far more likely than they had to be.
+The game uses deterministic lockstep: every machine runs the full simulation and only player
+commands travel over the network. That model is right for an RTS and stays. What was replaced is
+the original protocol around it (`Network.cpp`, `ConnectionManager`, `DisconnectManager`). There,
+every machine had to hear from every other machine about every frame before anyone could continue,
+so one late packet on one laptop froze all players. LAN play now uses a new layer;
+`LockstepNetwork.cpp` implements the game's `NetworkInterface` with it.
 
-| Problem in the original code | Where | Fix |
+### How it works
+
+- **The host sequences turns.** Clients send their commands to the host as soon as they are issued.
+  When the host executes frame *n*, it releases the *turn* for frame *n + D*. A turn holds every
+  command that reached the host since the previous turn, plus frame-synchronized events (a player
+  left, the players' states differ). Every machine executes frame *n* only with turn *n*, so all apply
+  the same commands on the same frame.
+- **A late packet hurts only its own player.** A client's late command simply goes into the next
+  turn. A client that receives turns late falls behind briefly and then catches up by running
+  faster; the others keep playing. The host only slows down, and finally waits (showing the
+  disconnect screen), for a client that is far behind.
+- **No head-of-line blocking.** Transport is [ENet](https://github.com/lsalzman/enet) (reliable
+  UDP, vendored). Reliable delivery holds back everything behind a lost packet until it is resent,
+  so turns also travel unreliably, bundled with the previous two. Clients likewise repeat commands
+  that have not yet appeared in a turn. Each player's commands are used in order and exactly once.
+- **The input delay D adapts to what happens.** Clients report their *cushion* (spare turns in
+  hand). The host adds a frame when a client ran out and removes one after 10 s without problems.
+  On a LAN, D is 2 frames (67 ms).
+- **Desync detection.** Every machine reports its state CRC to the host, which compares them and
+  announces a mismatch in a turn. Every machine then reacts, and writes its state dump, on the same
+  frame.
+- **The host may leave.** If the host quits or its connection is lost, the remaining player with
+  the lowest slot takes over. The others reconnect to it and report the last turn they have. It
+  collects any turns it lacks, fills in everyone's gaps and continues. A host that quits hands over
+  without any freeze; a host whose computer dies costs about 3 s (the connection timeout).
+- **Leaving, timeouts and votes.** A player who quits sends its self-destruct before leaving. A
+  player who is lost or voted out has its army destroyed. A player the game has waited on for the
+  player timeout (60 s) is dropped.
+
+The code is in `GameEngine/Include/GameNetwork/Lockstep` and
+`GameEngine/Source/GameNetwork/Lockstep` (no engine dependencies), plus
+`GameEngine/Source/GameNetwork/LockstepNetwork.cpp`.
+
+### Results
+
+`Tests/Network/lockstep_test.cpp` plays complete games in a simulated network (and one over real
+ENet on 127.0.0.1). It checks that every player executes the same commands on the same frames, and
+each command exactly once. Ten-minute games, wired host plus two laptops:
+
+| laptop link | input delay (avg) | frozen |
 |---|---|---|
-| A lost packet was resent only after a **fixed 2 seconds**, freezing everyone for up to 2 s. | `Connection.cpp` | Adaptive timeout from the measured round trip (RFC 6298: `srtt + max(50ms, 4·rttvar)`, clamped to 80–1000 ms), with capped exponential backoff. |
-| A lost packet always cost a full timeout. | `Connection.cpp` | **Redundant sends**: synchronized commands (frame info, game commands, run-ahead, player leave/destroy) ride along in the next 2 packet flushes until acked. The receiver already discards duplicates of exactly these types (`FrameData`, `NetCommandList`). |
-| Outgoing packets were batched for **half the run-ahead window** (166 ms at the minimum run-ahead, up to 500 ms). A command spent most of its time budget waiting to leave the machine. | `Network.cpp` | Flush twice per logic frame (16 ms; 8 ms on the packet router). |
-| **Acks waited for the same batching.** That inflated the measured latency, which raised the run-ahead, which raised the batching delay. | `Connection.cpp` | Queued acks are sent immediately. |
-| Run-ahead was based on the **average** latency, so normal Wi-Fi jitter regularly overran it. | `FrameMetrics.cpp`, `ConnectionManager.cpp` | Run-ahead uses `srtt + 2·rttvar` plus 2 frames of processing margin. It grows immediately and shrinks by at most 2 frames per update. |
-| Minimum run-ahead of 10 frames gave **333 ms of input delay even on a LAN**. | `NetworkUtil.cpp` | Minimum lowered to 6 frames (200 ms). The adaptive formula raises it whenever the link needs more. |
-| When a packet filled up, the command that didn't fit was **skipped** until the next send round. | `Connection::doSend` | That command now starts the next packet. |
+| wired LAN | 84 ms | 0 % |
+| good Wi-Fi (0.2 % loss) | 91 ms | 0 % |
+| busy Wi-Fi (1 % loss, 150 ms spikes) | 103 ms | 0 % |
+| bad Wi-Fi (3 % loss, 300 ms spikes) | 118 ms | 0.05 % |
+| Wi-Fi with a 250 ms dropout every 20 s | 146 ms | 0.86 % (that laptop only) |
 
-The timing policy lives in one header with no game dependencies:
-`GameEngine/Include/GameNetwork/NetworkTiming.h`.
+The original protocol had 333 ms of input delay on every link and froze everyone 12–65 % of the
+time on Wi-Fi in the same kind of model. The tests also cover 8 players, a player quitting, a
+computer crashing, a game hanging, the host quitting or crashing, a slow computer, a desync,
+rejection of a different executable, chat and file transfer.
 
-### Link model results
-
-`Tests/Determinism/networktiming_test.cpp` contains unit tests and a lockstep link simulation that
-uses the real header. The simulated game has 3 players (a wired host plus two laptops) and lasts
-20 minutes. It is a model of the protocol's timing, not the game itself:
-
-| laptop link | original: input delay | original: frozen | new: input delay | new: frozen |
-|---|---|---|---|---|
-| wired LAN | 334 ms | 0 % | 202 ms | 0 % |
-| good Wi-Fi (0.2 % loss) | 334 ms | 11.7 % | 202 ms | 0 % |
-| busy Wi-Fi (1 % loss, spikes) | 334 ms | 37.7 % | 202 ms | 0 % |
-| bad Wi-Fi (3 % loss, big spikes) | 334 ms | 64.7 % | 219 ms | 2.3 % |
-| internet, ~50 ms RTT (0.5 % loss) | 334 ms | 24.2 % | 203 ms | 0 % |
+The timing policy constants are in `Lockstep/Session.h`.
 
 ## Part 2: mismatches (desyncs)
 
@@ -109,27 +139,36 @@ The script prints the first differing byte and the labels in front of it (object
     g++ -O2 -ffp-contract=off -I../../Libraries/Source/WWVegas/WWMath detmath_test.cpp -o detmath_test && ./detmath_test
     g++ -O2 -I../../GameEngine/Include networktiming_test.cpp -o networktiming_test && ./networktiming_test
 
+    cd ../Network
+    g++ -O2 -std=c++14 -I../../GameEngine/Include -I../../Libraries/Source/ENet/include lockstep_test.cpp \
+        ../../GameEngine/Source/GameNetwork/Lockstep/Session.cpp ../../GameEngine/Source/GameNetwork/Lockstep/EnetTransport.cpp \
+        ../../Libraries/Source/ENet/*.c -o lockstep_test && ./lockstep_test
+
 On Windows, build the same files with `cl /O2 /fp:precise`. The DetMath hash must be
 `ba0d1902ead0e3eb` on every machine and compiler. CI checks this with GCC and Clang on Linux, and
 with MSVC and MinGW (32 and 64-bit) on Windows.
 
 ## Testing in the real game
 
-The engine has a built-in network impairment simulator (debug/internal builds) in `Transport.cpp`.
-It is controlled by the `GlobalData` settings `LatencyAverage`, `LatencyAmplitude`,
-`LatencyPeriod`, `LatencyNoise` and `PacketLoss`. Play a LAN game between two machines with, for
-example, 30 ms latency, 15 ms noise and 2 % loss, before and after the change, and compare how
-often the game freezes.
+Play a LAN game between two or three machines (Wi-Fi laptops are the interesting case). Things to try:
+quit from the menu, let the game end normally, pull a laptop's network for a few seconds, and quit
+the host's game. Before a session, record a replay and check it with `-replayCheck`
+(see [BUILDING.md](BUILDING.md)).
 
 ## Not done yet
 
-- **Not tested in a real game yet.** The game now builds with GCC (see [BUILDING.md](BUILDING.md)),
-  and the test programs pass on Linux and Windows, but nobody has played a LAN game with these
-  changes yet.
-- **The network layer itself is old.** These are fixes inside the original design. Next, the plan
-  is to replace it for LAN play: the host sequences turns, over a maintained UDP library.
-- **The packet router is still always slot 0 (the host).** Let the player with the best
-  connection host.
+- **Not tested in a real game yet.** The network layer passes its simulated and loopback tests, and
+  the game compiles and starts. Nobody has played a LAN game with it yet.
+- **The old protocol's code is still in the tree** (`Network.cpp`, `ConnectionManager.cpp`, ...).
+  `Network.cpp` is no longer built; the rest is compiled but unused. It can be deleted once the new
+  layer has been played.
+- **The disconnect screen shows only your own vote**, not everyone's vote counts.
+- **A machine that does not answer for 10 s is dropped** (ENet's connection timeout; the original
+  waited 60 s on its disconnect screen). Shorter would drop a laptop whose game merely stalls for a
+  moment; longer would make everyone wait that long when a computer really dies.
+- **In a two-player game a network cut splits the game**: each side sees the other leave. With
+  three or more players, a machine that finds itself alone after losing the host stops instead of
+  playing on by itself.
 - **16 uses of `GameClientRandomValue` inside `GameLogic` were not audited.** The client-side
   random generator must never influence simulation state.
-- **The GameSpy (online) code paths were not touched.**
+- **Online (GameSpy) play** is not supported: GameSpy shut down in 2014.

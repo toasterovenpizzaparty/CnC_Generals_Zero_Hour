@@ -2572,73 +2572,10 @@ void GameLogic::processCommandList( CommandList *list )
 		logicMessageDispatcher( msg, NULL );
 	}
 
-	if (m_shouldValidateCRCs && !TheNetwork->sawCRCMismatch())
-	{
-		Bool sawCRCMismatch = FALSE;
-		Int numPlayers = 0;
-		DEBUG_ASSERTCRASH(TheNetwork, ("No Network!"));
-		if (TheNetwork)
-		{
-			for (Int i=0; i<MAX_SLOTS; ++i)
-			{
-				if (TheNetwork->isPlayerConnected(i))
-					++numPlayers;
-			}
-
-			if (m_cachedCRCs.size() < numPlayers)
-			{
-				DEBUG_CRASH(("Not enough CRCs!"));
-				sawCRCMismatch = TRUE;
-			}
-			else
-			{
-				//DEBUG_LOG(("Comparing %d CRCs on frame %d\n", m_cachedCRCs.size(), m_frame));
-				std::map<Int, UnsignedInt>::const_iterator crcIt = m_cachedCRCs.begin();
-				Int validatorCRC = crcIt->second;
-				//DEBUG_LOG(("Validator CRC from player %d is %8.8X\n", crcIt->first, validatorCRC));
-				while (++crcIt != m_cachedCRCs.end())
-				{
-					Int validatedCRC = crcIt->second;
-					//DEBUG_LOG(("CRC to validate is from player %d: %8.8X\n", crcIt->first, validatedCRC));
-					if (validatorCRC != validatedCRC)
-					{
-						DEBUG_CRASH(("CRC mismatch!"));
-						sawCRCMismatch = TRUE;
-					}
-				}
-			}
-		}
-
-		if (sawCRCMismatch)
-		{
-#ifdef DEBUG_LOGGING
-			DEBUG_LOG(("CRC Mismatch - saw %d CRCs from %d players\n", m_cachedCRCs.size(), numPlayers));
-			for (std::map<Int, UnsignedInt>::const_iterator crcIt = m_cachedCRCs.begin(); crcIt != m_cachedCRCs.end(); ++crcIt)
-			{
-				Player *player = ThePlayerList->getNthPlayer(crcIt->first);
-				DEBUG_LOG(("CRC from player %d (%ls) = %X\n", crcIt->first,
-					player?player->getPlayerDisplayName().str():L"<NONE>", crcIt->second));
-			}
-#endif DEBUG_LOGGING
-			TheNetwork->setSawCRCMismatch();
-
-			// Every machine reaches this point on the same logic frame.  Write this machine's complete
-			// simulation state so the files from all players can be compared to find exactly which
-			// object diverged first (see Tests/Determinism/compare_desync_dumps.py).
-			AsciiString dumpName;
-			dumpName.format("%sDesync_frame%d_player%d.crc", TheGlobalData->getPath_UserData().str(),
-				m_frame, TheNetwork->getLocalPlayerID());
-			try
-			{
-				getCRC(CRC_RECALC, dumpName);
-				DEBUG_LOG(("CRC Mismatch - wrote simulation state to %s\n", dumpName.str()));
-			}
-			catch (...)
-			{
-				DEBUG_LOG(("CRC Mismatch - could not write %s\n", dumpName.str()));
-			}
-		}
-	}
+	// Network games: the CRCs of all players are compared by the network layer (the LAN host),
+	// which announces a mismatch on the same frame to everyone and writes the state dumps there
+	// (LockstepNetwork.cpp).  The comparison that was here assumed every player's CRC message
+	// executes on the same frame, which the turn-based network does not guarantee.
 
 }  // end processCommandList
 

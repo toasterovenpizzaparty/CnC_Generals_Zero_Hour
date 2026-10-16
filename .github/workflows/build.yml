@@ -78,6 +78,15 @@ jobs:
           g++ -O2 -I../../GameEngine/Include networktiming_test.cpp -o networktiming_test
           ./networktiming_test
 
+      - name: Lockstep network (simulated games and real ENet on loopback)
+        run: |
+          cd ../Network
+          g++ -O2 -std=c++14 -I../../GameEngine/Include -I../../Libraries/Source/ENet/include \
+            lockstep_test.cpp ../../GameEngine/Source/GameNetwork/Lockstep/Session.cpp \
+            ../../GameEngine/Source/GameNetwork/Lockstep/EnetTransport.cpp ../../Libraries/Source/ENet/*.c \
+            -o lockstep_test
+          ./lockstep_test
+
       - name: Cross-compile tests for Windows
         run: |
           set -e
@@ -86,6 +95,10 @@ jobs:
           i686-w64-mingw32-g++-posix -O2 -ffp-contract=off -msse2 -mfpmath=sse -static $inc detmath_test.cpp -o win/detmath_mingw32.exe
           x86_64-w64-mingw32-g++-posix -O2 -ffp-contract=off -static $inc detmath_test.cpp -o win/detmath_mingw64.exe
           i686-w64-mingw32-g++-posix -O2 -static -I../../GameEngine/Include networktiming_test.cpp -o win/networktiming_mingw32.exe
+          i686-w64-mingw32-gcc-posix -O2 -c -I../../Libraries/Source/ENet/include ../../Libraries/Source/ENet/*.c
+          i686-w64-mingw32-g++-posix -O2 -std=c++14 -static -I../../GameEngine/Include -I../../Libraries/Source/ENet/include \
+            ../Network/lockstep_test.cpp ../../GameEngine/Source/GameNetwork/Lockstep/Session.cpp \
+            ../../GameEngine/Source/GameNetwork/Lockstep/EnetTransport.cpp *.o -lws2_32 -lwinmm -o win/lockstep_test_mingw32.exe
           i686-w64-mingw32-g++-posix -O2 -static -I../../Compat -I../../Libraries/Source/miniaudio \
             ../Audio/mss_test.cpp ../../Compat/MSS/mss_miniaudio.cpp -lole32 -lwinmm -o win/mss_test_mingw32.exe
 
@@ -133,3 +146,6 @@ jobs:
       # device in real time, which is enough to check decoding, timing, callbacks and loops.
       - name: Audio layer (MinGW build)
         run: win\mss_test_mingw32.exe
+
+      - name: Lockstep network (MinGW build, real ENet on Windows loopback)
+        run: win\lockstep_test_mingw32.exe
