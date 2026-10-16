@@ -14,10 +14,10 @@
 #include <string.h>
 #include <vector>
 
-typedef unsigned int Pixel;	// 0xAARRGGBB
+typedef unsigned int TexPixel;	// 0xAARRGGBB
 
 // ------------------------------------------------------------------------------------------------
-// Pixel formats
+// TexPixel formats
 // ------------------------------------------------------------------------------------------------
 
 static bool IsDXT(D3DFORMAT f)
@@ -38,19 +38,19 @@ static UINT BytesPerPixel(D3DFORMAT f)
 	}
 }
 
-static inline Pixel Expand(unsigned v, int bits)
+static inline TexPixel Expand(unsigned v, int bits)
 {
 	// replicate the high bits so 0 -> 0 and max -> 255
 	unsigned x = v << (8 - bits);
 	return x | (x >> bits);
 }
 
-static Pixel DecodePixel(const unsigned char *p, D3DFORMAT f, const PALETTEENTRY *pal)
+static TexPixel DecodePixel(const unsigned char *p, D3DFORMAT f, const PALETTEENTRY *pal)
 {
 	unsigned v;
 	switch (f)
 	{
-		case D3DFMT_A8R8G8B8: return p[0] | (p[1] << 8) | (p[2] << 16) | ((Pixel)p[3] << 24);
+		case D3DFMT_A8R8G8B8: return p[0] | (p[1] << 8) | (p[2] << 16) | ((TexPixel)p[3] << 24);
 		case D3DFMT_X8R8G8B8: return p[0] | (p[1] << 8) | (p[2] << 16) | 0xFF000000u;
 		case D3DFMT_R8G8B8:   return p[0] | (p[1] << 8) | (p[2] << 16) | 0xFF000000u;
 		case D3DFMT_R5G6B5:
@@ -69,24 +69,24 @@ static Pixel DecodePixel(const unsigned char *p, D3DFORMAT f, const PALETTEENTRY
 			return 0xFF000000u | (Expand(v >> 5, 3) << 16) | (Expand((v >> 2) & 7, 3) << 8) | Expand(v & 3, 2);
 		case D3DFMT_A8R3G3B2:
 			v = p[0] | (p[1] << 8);
-			return ((Pixel)(v >> 8) << 24) | (Expand((v >> 5) & 7, 3) << 16) | (Expand((v >> 2) & 7, 3) << 8) | Expand(v & 3, 2);
-		case D3DFMT_A8:  return (Pixel)p[0] << 24;
+			return ((TexPixel)(v >> 8) << 24) | (Expand((v >> 5) & 7, 3) << 16) | (Expand((v >> 2) & 7, 3) << 8) | Expand(v & 3, 2);
+		case D3DFMT_A8:  return (TexPixel)p[0] << 24;
 		case D3DFMT_L8:  return 0xFF000000u | (p[0] << 16) | (p[0] << 8) | p[0];
-		case D3DFMT_A8L8: return ((Pixel)p[1] << 24) | (p[0] << 16) | (p[0] << 8) | p[0];
+		case D3DFMT_A8L8: return ((TexPixel)p[1] << 24) | (p[0] << 16) | (p[0] << 8) | p[0];
 		case D3DFMT_A4L4:
 			v = Expand(p[0] & 15, 4);
 			return (Expand(p[0] >> 4, 4) << 24) | (v << 16) | (v << 8) | v;
 		case D3DFMT_P8:
 			if (pal) {
 				const PALETTEENTRY &e = pal[p[0]];
-				return ((Pixel)e.peFlags << 24) | (e.peRed << 16) | (e.peGreen << 8) | e.peBlue;
+				return ((TexPixel)e.peFlags << 24) | (e.peRed << 16) | (e.peGreen << 8) | e.peBlue;
 			}
 			return 0xFF000000u | (p[0] << 16) | (p[0] << 8) | p[0];
 		default: return 0;
 	}
 }
 
-static void EncodePixel(unsigned char *p, D3DFORMAT f, Pixel c)
+static void EncodePixel(unsigned char *p, D3DFORMAT f, TexPixel c)
 {
 	unsigned a = c >> 24, r = (c >> 16) & 255, g = (c >> 8) & 255, b = c & 255;
 	unsigned v;
@@ -115,28 +115,28 @@ static void EncodePixel(unsigned char *p, D3DFORMAT f, Pixel c)
 
 // ---- DXT ---------------------------------------------------------------------------------------
 
-static Pixel From565(unsigned v)
+static TexPixel From565(unsigned v)
 {
 	return 0xFF000000u | (Expand((v >> 11) & 31, 5) << 16) | (Expand((v >> 5) & 63, 6) << 8) | Expand(v & 31, 5);
 }
 
-static unsigned To565(Pixel c)
+static unsigned To565(TexPixel c)
 {
 	return ((((c >> 16) & 255) >> 3) << 11) | ((((c >> 8) & 255) >> 2) << 5) | ((c & 255) >> 3);
 }
 
-static Pixel Mix(Pixel a, Pixel b, int wa, int wb, int div)
+static TexPixel Mix(TexPixel a, TexPixel b, int wa, int wb, int div)
 {
-	Pixel r = 0;
+	TexPixel r = 0;
 	for (int s = 0; s < 24; s += 8)
 		r |= ((((a >> s) & 255) * wa + ((b >> s) & 255) * wb) / div) << s;
 	return r | 0xFF000000u;
 }
 
-static void DecodeColorBlock(const unsigned char *blk, Pixel out[16], bool dxt1)
+static void DecodeColorBlock(const unsigned char *blk, TexPixel out[16], bool dxt1)
 {
 	unsigned c0 = blk[0] | (blk[1] << 8), c1 = blk[2] | (blk[3] << 8);
-	Pixel pal[4];
+	TexPixel pal[4];
 	pal[0] = From565(c0);
 	pal[1] = From565(c1);
 	if (!dxt1 || c0 > c1) {
@@ -151,7 +151,7 @@ static void DecodeColorBlock(const unsigned char *blk, Pixel out[16], bool dxt1)
 		out[i] = pal[(bits >> (i * 2)) & 3];
 }
 
-static void DecodeDXTBlock(const unsigned char *blk, D3DFORMAT f, Pixel out[16])
+static void DecodeDXTBlock(const unsigned char *blk, D3DFORMAT f, TexPixel out[16])
 {
 	if (f == D3DFMT_DXT1) {
 		DecodeColorBlock(blk, out, true);
@@ -176,11 +176,11 @@ static void DecodeDXTBlock(const unsigned char *blk, D3DFORMAT f, Pixel out[16])
 		unsigned long long bits = 0;
 		for (int i = 0; i < 6; ++i) bits |= (unsigned long long)blk[2 + i] << (8 * i);
 		for (int i = 0; i < 16; ++i)
-			out[i] = (out[i] & 0x00FFFFFFu) | ((Pixel)pal[(bits >> (3 * i)) & 7] << 24);
+			out[i] = (out[i] & 0x00FFFFFFu) | ((TexPixel)pal[(bits >> (3 * i)) & 7] << 24);
 	}
 }
 
-static int ColorDist(Pixel a, Pixel b)
+static int ColorDist(TexPixel a, TexPixel b)
 {
 	int dr = (int)((a >> 16) & 255) - (int)((b >> 16) & 255);
 	int dg = (int)((a >> 8) & 255) - (int)((b >> 8) & 255);
@@ -188,12 +188,12 @@ static int ColorDist(Pixel a, Pixel b)
 	return dr * dr * 2 + dg * dg * 4 + db * db;
 }
 
-static void EncodeColorBlock(const Pixel in[16], unsigned char *blk, bool dxt1)
+static void EncodeColorBlock(const TexPixel in[16], unsigned char *blk, bool dxt1)
 {
 	// Endpoints: the two pixels farthest apart along the luminance axis (simple and robust).
 	bool transparent = false;
 	int minL = 1 << 30, maxL = -1;
-	Pixel lo = 0, hi = 0;
+	TexPixel lo = 0, hi = 0;
 	for (int i = 0; i < 16; ++i) {
 		if (dxt1 && (in[i] >> 24) < 128) { transparent = true; continue; }
 		int l = (int)((in[i] >> 16) & 255) * 2 + (int)((in[i] >> 8) & 255) * 4 + (int)(in[i] & 255);
@@ -201,7 +201,7 @@ static void EncodeColorBlock(const Pixel in[16], unsigned char *blk, bool dxt1)
 		if (l > maxL) { maxL = l; hi = in[i]; }
 	}
 	unsigned c0 = To565(hi), c1 = To565(lo);
-	Pixel pal[4];
+	TexPixel pal[4];
 	if (dxt1 && transparent) {
 		if (c0 > c1) { unsigned t = c0; c0 = c1; c1 = t; }		// c0 <= c1 selects the 3 colour mode
 		pal[0] = From565(c0); pal[1] = From565(c1); pal[2] = Mix(pal[0], pal[1], 1, 1, 2); pal[3] = 0;
@@ -234,7 +234,7 @@ static void EncodeColorBlock(const Pixel in[16], unsigned char *blk, bool dxt1)
 	blk[6] = (unsigned char)(bits >> 16); blk[7] = (unsigned char)(bits >> 24);
 }
 
-static void EncodeDXTBlock(const Pixel in[16], D3DFORMAT f, unsigned char *blk)
+static void EncodeDXTBlock(const TexPixel in[16], D3DFORMAT f, unsigned char *blk)
 {
 	if (f == D3DFMT_DXT1) {
 		EncodeColorBlock(in, blk, true);
@@ -273,27 +273,27 @@ static void EncodeDXTBlock(const Pixel in[16], D3DFORMAT f, unsigned char *blk)
 }
 
 // ------------------------------------------------------------------------------------------------
-// Image <-> locked surface
+// TexImage <-> locked surface
 // ------------------------------------------------------------------------------------------------
 
-struct Image
+struct TexImage
 {
 	UINT w, h;
-	std::vector<Pixel> px;
-	Image(UINT ww = 0, UINT hh = 0) : w(ww), h(hh), px((size_t)ww * hh) {}
-	Pixel &at(UINT x, UINT y) { return px[(size_t)y * w + x]; }
-	Pixel at(UINT x, UINT y) const { return px[(size_t)y * w + x]; }
+	std::vector<TexPixel> px;
+	TexImage(UINT ww = 0, UINT hh = 0) : w(ww), h(hh), px((size_t)ww * hh) {}
+	TexPixel &at(UINT x, UINT y) { return px[(size_t)y * w + x]; }
+	TexPixel at(UINT x, UINT y) const { return px[(size_t)y * w + x]; }
 };
 
-static bool ReadLocked(const D3DLOCKED_RECT &lr, D3DFORMAT f, UINT w, UINT h, const PALETTEENTRY *pal, Image &img)
+static bool ReadLocked(const D3DLOCKED_RECT &lr, D3DFORMAT f, UINT w, UINT h, const PALETTEENTRY *pal, TexImage &img)
 {
-	img = Image(w, h);
+	img = TexImage(w, h);
 	const unsigned char *base = (const unsigned char *)lr.pBits;
 	if (IsDXT(f)) {
 		UINT blockBytes = (f == D3DFMT_DXT1) ? 8 : 16;
 		for (UINT by = 0; by < (h + 3) / 4; ++by)
 			for (UINT bx = 0; bx < (w + 3) / 4; ++bx) {
-				Pixel blk[16];
+				TexPixel blk[16];
 				DecodeDXTBlock(base + by * lr.Pitch + bx * blockBytes, f, blk);
 				for (UINT j = 0; j < 4; ++j)
 					for (UINT i = 0; i < 4; ++i)
@@ -311,14 +311,14 @@ static bool ReadLocked(const D3DLOCKED_RECT &lr, D3DFORMAT f, UINT w, UINT h, co
 	return true;
 }
 
-static bool WriteLocked(D3DLOCKED_RECT &lr, D3DFORMAT f, const Image &img)
+static bool WriteLocked(D3DLOCKED_RECT &lr, D3DFORMAT f, const TexImage &img)
 {
 	unsigned char *base = (unsigned char *)lr.pBits;
 	if (IsDXT(f)) {
 		UINT blockBytes = (f == D3DFMT_DXT1) ? 8 : 16;
 		for (UINT by = 0; by < (img.h + 3) / 4; ++by)
 			for (UINT bx = 0; bx < (img.w + 3) / 4; ++bx) {
-				Pixel blk[16];
+				TexPixel blk[16];
 				for (UINT j = 0; j < 4; ++j)
 					for (UINT i = 0; i < 4; ++i) {
 						UINT x = bx * 4 + i, y = by * 4 + j;
@@ -339,19 +339,19 @@ static bool WriteLocked(D3DLOCKED_RECT &lr, D3DFORMAT f, const Image &img)
 	return true;
 }
 
-static Image Resample(const Image &src, UINT w, UINT h, DWORD filter)
+static TexImage Resample(const TexImage &src, UINT w, UINT h, DWORD filter)
 {
 	if (src.w == w && src.h == h)
 		return src;
-	Image dst(w, h);
+	TexImage dst(w, h);
 	DWORD kind = filter & 0xFFFF;
 	bool point = (kind == D3DX_FILTER_NONE || kind == D3DX_FILTER_POINT);
 	if (!point && src.w == w * 2 && src.h == h * 2) {
 		// 2x2 box filter (mip map generation)
 		for (UINT y = 0; y < h; ++y)
 			for (UINT x = 0; x < w; ++x) {
-				Pixel p[4] = { src.at(2 * x, 2 * y), src.at(2 * x + 1, 2 * y), src.at(2 * x, 2 * y + 1), src.at(2 * x + 1, 2 * y + 1) };
-				Pixel r = 0;
+				TexPixel p[4] = { src.at(2 * x, 2 * y), src.at(2 * x + 1, 2 * y), src.at(2 * x, 2 * y + 1), src.at(2 * x + 1, 2 * y + 1) };
+				TexPixel r = 0;
 				for (int s = 0; s < 32; s += 8)
 					r |= ((((p[0] >> s) & 255) + ((p[1] >> s) & 255) + ((p[2] >> s) & 255) + ((p[3] >> s) & 255) + 2) / 4) << s;
 				dst.at(x, y) = r;
@@ -371,11 +371,11 @@ static Image Resample(const Image &src, UINT w, UINT h, DWORD filter)
 			UINT x0 = (UINT)fx, y0 = (UINT)fy;
 			UINT x1 = (x0 + 1 < src.w) ? x0 + 1 : x0, y1 = (y0 + 1 < src.h) ? y0 + 1 : y0;
 			float ax = fx - x0, ay = fy - y0;
-			Pixel r = 0;
+			TexPixel r = 0;
 			for (int s = 0; s < 32; s += 8) {
 				float c = ((src.at(x0, y0) >> s) & 255) * (1 - ax) * (1 - ay) + ((src.at(x1, y0) >> s) & 255) * ax * (1 - ay) +
 					((src.at(x0, y1) >> s) & 255) * (1 - ax) * ay + ((src.at(x1, y1) >> s) & 255) * ax * ay;
-				r |= ((Pixel)(c + 0.5f) & 255) << s;
+				r |= ((TexPixel)(c + 0.5f) & 255) << s;
 			}
 			dst.at(x, y) = r;
 		}
@@ -432,7 +432,7 @@ HRESULT WINAPI D3DXLoadSurfaceFromSurface(LPDIRECT3DSURFACE8 dst, CONST PALETTEE
 		return D3D_OK;
 	}
 
-	Image img;
+	TexImage img;
 	bool ok = ReadLocked(sl, sd.Format, sw, sh, srcPal, img);
 	src->UnlockRect();
 	if (!ok)
@@ -588,7 +588,7 @@ HRESULT WINAPI D3DXFilterTexture(LPDIRECT3DBASETEXTURE8 base, CONST PALETTEENTRY
 }
 
 // ------------------------------------------------------------------------------------------------
-// Image files (DDS, TGA)
+// TexImage files (DDS, TGA)
 // ------------------------------------------------------------------------------------------------
 
 struct FileImage

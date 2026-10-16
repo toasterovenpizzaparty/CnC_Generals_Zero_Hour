@@ -24,9 +24,11 @@
 	#define D3DPRESENT_RATE_DEFAULT	0x00000000
 	#endif
 	// _set_se_translator (MSVC structured exception translation) is declared in <eh.h>, which
-	// MSVC pulls in implicitly.  With GCC it has no effect; crashes are still reported by the
-	// unhandled exception filter.
+	// MSVC pulls in implicitly.  MinGW declares it but the runtime does not export it, and GCC
+	// cannot translate structured exceptions into C++ exceptions anyway: make it a no-op.
+	// Crashes are still reported by the unhandled exception filter.
 	#include <eh.h>
+	#define _set_se_translator(f) ((_se_translator_function)0)
 
 	// MSVC accepts _int64 as a synonym of __int64.
 	#ifndef _int64

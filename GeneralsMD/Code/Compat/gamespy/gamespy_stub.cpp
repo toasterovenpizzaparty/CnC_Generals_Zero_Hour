@@ -152,3 +152,8 @@ void GetPersistDataValues(int, int, persisttype_t, int, const char *, PersDataCa
 void SetPersistDataValues(int, int, persisttype_t, int, const char *, PersDataSaveCallbackFn, void *) {}
 
 } // extern "C"
+
+// Declared (without a header) by the online lobby menus; the original came from the GameSpy
+// query & reporting SDK.  0 = not hosting.
+// The menus declare it inside an extern "C" block.
+extern "C" int getQR2HostingStatus(void) { return 0; }
