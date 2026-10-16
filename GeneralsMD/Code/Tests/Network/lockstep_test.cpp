@@ -385,10 +385,12 @@ struct GameSetup
 	int crashSlot; double crashAtMs;	// a player's computer dies
 	int slowSlot; double slowUpdateMs;	// a slow computer: game loop every slowUpdateMs
 	int corruptSlot; Frame corruptAtFrame;	// a desync
+	int hangSlot; double hangAtMs;		// a player's game hangs; its connection stays up
+	uint32_t dropAfterMs;				// SessionConfig::dropAfterMs
 	uint64_t seed;
 
 	GameSetup() : players(3), seconds(60), commandsPerSecond(2), leaveSlot(-1), leaveAtMs(0), crashSlot(-1), crashAtMs(0),
-		slowSlot(-1), slowUpdateMs(0), corruptSlot(-1), corruptAtFrame(0), seed(1)
+		slowSlot(-1), slowUpdateMs(0), corruptSlot(-1), corruptAtFrame(0), hangSlot(-1), hangAtMs(0), dropAfterMs(0), seed(1)
 	{
 		for (int i = 0; i < MAX_PLAYERS; ++i) links[i] = WIRED;
 	}
@@ -404,6 +406,7 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 	base.exeCRC = 0xabcd;
 	base.iniCRC = 0xef01;
 	base.firstFrame = 1;
+	base.dropAfterMs = setup.dropAfterMs;
 	for (int i = 0; i < setup.players; ++i) {
 		base.players[i].human = true;
 		base.players[i].ip = 0x0a000001 + i;
@@ -448,6 +451,7 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 			}
 
 			if (net.now < p.nextUpdate) continue;
+			if (i == setup.hangSlot && net.now >= setup.hangAtMs) continue;	// hung: only the network runs
 			p.nextUpdate = net.now + p.updateIntervalMs;
 
 			// player input
@@ -532,6 +536,13 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 				if (players[i].hashAt[k] != players[j].hashAt[k]) { r.identical = false; break; }
 		}
 	r.framesPlayed = common == (size_t)-1 ? 0 : (int)common;
+	if (setup.hangSlot >= 0) {
+		// the hung player is not part of the comparison of who kept playing
+		common = (size_t)-1;
+		for (int i = 0; i < setup.players; ++i)
+			if (i != setup.hangSlot && !players[i].left && !players[i].crashed) common = std::min(common, players[i].hashAt.size());
+		r.framesPlayed = (int)common;
+	}
 
 	// Every command of a player who stayed was executed exactly once (except the last ones still in
 	// flight when the simulation stopped).
@@ -541,8 +552,9 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 		if (obs.left || obs.crashed) continue;
 		for (std::map<std::pair<int, uint32_t>, int>::const_iterator it = obs.executed.begin(); it != obs.executed.end(); ++it)
 			if (it->second != 1) r.exactlyOnce = false;
+		if (i == setup.hangSlot) continue;
 		for (int s = 0; s < setup.players; ++s) {
-			if (players[s].left || players[s].crashed) continue;
+			if (players[s].left || players[s].crashed || s == setup.hangSlot) continue;
 			for (std::map<uint32_t, double>::const_iterator it = players[s].issuedAtMs.begin(); it != players[s].issuedAtMs.end(); ++it)
 				if (it->second < end - 2000 && !obs.executed.count(std::make_pair(s, it->first))) r.exactlyOnce = false;
 		}
@@ -555,7 +567,7 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 	for (int i = 0; i < setup.players; ++i) {
 		const Player &p = players[i];
 		for (size_t k = 0; k < p.inputDelayMs.size(); ++k) { sum += p.inputDelayMs[k]; mx = std::max(mx, p.inputDelayMs[k]); ++n; }
-		if (p.left || p.crashed) continue;
+		if (p.left || p.crashed || i == setup.hangSlot) continue;
 		r.frozenPercentWorst = std::max(r.frozenPercentWorst, 100.0 * p.frozenMs / end);
 		r.longestFreezeMs = std::max(r.longestFreezeMs, p.longestFreezeMs);
 	}
@@ -709,6 +721,26 @@ static void TestHostChange(bool crash)
 	CHECK(r.framesPlayed > 50 * 30 * 0.85, "the game went on (%d frames)", r.framesPlayed);
 }
 
+static void TestHang()
+{
+	printf("A player's game hangs after 20 s, its connection stays up (drop after 10 s)\n");
+	GameSetup s;
+	s.players = 3;
+	s.seconds = 50;
+	s.hangSlot = 2;
+	s.hangAtMs = 20000;
+	s.dropAfterMs = 10000;
+	s.seed = 81;
+	std::vector<Player> players;
+	GameResult r = RunSimulatedGame(s, &players);
+	CHECK(r.identical, "the others stay identical");
+	bool dropped = !players[0].leftEvents.empty() && players[0].leftEvents == players[1].leftEvents && players[0].leftEvents[0].second == 2;
+	CHECK(dropped, "it was dropped, on the same frame for both");
+	printf("       longest freeze %.0f ms, frames played %d\n", r.longestFreezeMs, r.framesPlayed);
+	CHECK(r.longestFreezeMs > 9000 && r.longestFreezeMs < 13000, "the game waited about the drop time, then went on");
+	CHECK(r.framesPlayed > 50 * 30 * 0.7, "and continued (%d frames)", r.framesPlayed);
+}
+
 static void TestSlowComputer()
 {
 	printf("One computer runs its game loop only 25 times per second (needs 30)\n");
@@ -791,6 +823,7 @@ static void TestChatAndFiles()
 			s1.sendChat((1 << 2), text);			// 1 -> 2 only
 			s0.sendChat((1 << 1) | (1 << 2), text);	// host -> both
 			s2.announceFile(77, "maps/test.map", 60000, (1 << 0) | (1 << 1));
+			s0.announceFile(78, "maps/other.map", 10, (1 << 1));	// player 2 is not a recipient...
 			s2.sendFileData(77, 0, chunk);
 			s2.sendFileData(77, 30000, chunk);
 		}
@@ -807,19 +840,21 @@ static void TestChatAndFiles()
 				}
 		}
 	}
-	int chats[3] = { 0, 0, 0 }, data[3] = { 0, 0, 0 }, announce[3] = { 0, 0, 0 }, progress = 0;
+	int chats[3] = { 0, 0, 0 }, data[3] = { 0, 0, 0 }, announce[3] = { 0, 0, 0 }, otherAnnounce[3] = { 0, 0, 0 }, progress = 0;
 	for (int i = 0; i < 3; ++i)
 		for (size_t k = 0; k < got[i].size(); ++k) {
 			const Event &e = got[i][k];
 			if (e.type == Event::CHAT) ++chats[i];
 			if (e.type == Event::FILE_DATA) ++data[i];
 			if (e.type == Event::FILE_ANNOUNCE && e.name == "maps/test.map") ++announce[i];
-			if (e.type == Event::FILE_PROGRESS && i == 2 && e.value == 100) ++progress;
+			if (e.type == Event::FILE_ANNOUNCE && e.name == "maps/other.map" && e.mask == (1 << 1)) ++otherAnnounce[i];
+			if (e.type == Event::FILE_PROGRESS && e.value == 100) ++progress;
 		}
 	CHECK(chats[0] == 0 && chats[1] == 1 && chats[2] == 2, "chat reaches exactly the addressed players");
-	CHECK(announce[0] == 1 && announce[1] == 1 && announce[2] == 0 && data[0] == 2 && data[1] == 2 && data[2] == 0,
-		"file announce and data reach the recipients only");
-	CHECK(progress == 2, "both recipients' progress reaches the sender");
+	CHECK(announce[0] == 1 && announce[1] == 1 && announce[2] == 0, "everyone else hears about the file");
+	CHECK(data[0] == 2 && data[1] == 2 && data[2] == 0, "file data reaches the recipients");
+	CHECK(otherAnnounce[1] == 1 && otherAnnounce[2] == 1, "...but still hears about it, with the recipient mask");
+	CHECK(progress == 4, "each recipient's progress reaches the other two players");
 }
 
 static void TestRealEnet()
@@ -894,6 +929,7 @@ int main()
 	TestCrash();
 	TestHostChange(false);
 	TestHostChange(true);
+	TestHang();
 	TestSlowComputer();
 	TestDesync();
 	TestRealEnet();

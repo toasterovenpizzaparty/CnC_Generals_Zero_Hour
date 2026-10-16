@@ -85,8 +85,10 @@ struct SessionConfig
 	uint32_t iniCRC;
 	Frame firstFrame;		// first frame that needs a turn
 	int frameRate;
+	uint32_t dropAfterMs;	// host: drop a player the game has waited for this long (0 = never)
 
-	SessionConfig() : localSlot(0), hostSlot(0), sessionId(0), exeCRC(0), iniCRC(0), firstFrame(1), frameRate(DEFAULT_FRAME_RATE) {}
+	SessionConfig() : localSlot(0), hostSlot(0), sessionId(0), exeCRC(0), iniCRC(0), firstFrame(1),
+		frameRate(DEFAULT_FRAME_RATE), dropAfterMs(0) {}
 };
 
 struct Command
@@ -130,7 +132,7 @@ struct Event
 		PLAYER_LOST,		// a player's connection dropped (the PLAYER_LEFT turn event follows)
 		FILE_ANNOUNCE,		// slot = sender, id, name, value = total size, mask = recipients
 		FILE_DATA,			// slot = sender, id, value = offset, data
-		FILE_PROGRESS		// slot = recipient, id, value = percent
+		FILE_PROGRESS		// slot = the player reporting, id, value = percent received
 	};
 
 	Type type;
@@ -191,11 +193,14 @@ public:
 	void reportCRC(Frame f, uint32_t crc);
 	void voteToDrop(int slot);
 	void leave();
+	/// After leave(): true once our last messages have been delivered (or nobody is left to tell).
+	bool leaveDelivered();
 
 	// --- chat and files (bulk channel) ---
 	void sendChat(uint32_t mask, const std::vector<uint16_t> &text);
 	void announceFile(uint32_t id, const std::string &name, uint32_t totalSize, uint32_t mask);
 	void sendFileData(uint32_t id, uint32_t offset, const std::vector<uint8_t> &data);
+	/// Tells every player how much of file `id` (sent by `senderSlot`) this machine has received.
 	void sendFileProgress(int senderSlot, uint32_t id, int percent);
 
 	bool pollEvent(Event &event);

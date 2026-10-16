@@ -147,11 +147,15 @@ target_link_libraries(zh_lockstep PUBLIC zh_enet PRIVATE zh_options)
 # ------------------------------------------------------------------------------------------------
 # Game engine
 # ------------------------------------------------------------------------------------------------
+# The original network implementation (Network.cpp: frame-info protocol, ConnectionManager) is
+# replaced by LockstepNetwork.cpp on the lockstep session (GameNetwork/Lockstep).
+list(REMOVE_ITEM GAMEENGINE_SOURCES "GameEngine/Source/GameNetwork/Network.cpp")
+list(APPEND GAMEENGINE_SOURCES "GameEngine/Source/GameNetwork/LockstepNetwork.cpp")
 zh_library(gameengine SOURCES ${GAMEENGINE_SOURCES}
     INCLUDES ${ZH_CODE}/GameEngine/Include ${ZH_CODE}/GameEngine/Include/Precompiled
              ${ZH_CODE}/Libraries/Include ${WWV} ${ZH_CODE}/Libraries/Source/Compression
     DEFINES Z_PREFIX IG_DEBUG_STACKTRACE
-    LINK compression wwlib wwmath wwdownload zh_gamespy_stub)
+    LINK compression wwlib wwmath wwdownload zh_gamespy_stub zh_lockstep)
 # The original project used PreRTS.h as precompiled header (/Yu"PreRTS.h"); every .cpp includes it first.
 target_precompile_headers(gameengine PRIVATE ${ZH_CODE}/GameEngine/Include/Precompiled/PreRTS.h)
 

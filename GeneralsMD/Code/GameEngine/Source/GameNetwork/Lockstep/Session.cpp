@@ -13,6 +13,8 @@ namespace Lockstep {
 
 namespace {
 
+const uint32_t ALL_PLAYERS = (1u << MAX_PLAYERS) - 1;
+
 // Message size limits, so a corrupt or hostile message cannot make us allocate without bound.
 const uint32_t MAX_COMMANDS_PER_MESSAGE = 4096;
 const uint32_t MAX_EVENTS_PER_TURN = 64;
@@ -490,6 +492,37 @@ void Session::leave()
 	m_transport->flush();
 }
 
+bool Session::leaveDelivered()
+{
+	if (!m_left || !m_running) {
+		return true;
+	}
+	// Keep the transport going until the peers acknowledged our disconnect: ENet delivers every
+	// queued message first.
+	TransportEvent e;
+	while (m_transport->poll(e)) {
+		if (e.type == TransportEvent::DISCONNECTED) {
+			if (e.peer == m_hostPeer) {
+				m_hostPeer = NO_PEER;
+			}
+			for (int i = 0; i < MAX_PLAYERS; ++i) {
+				if (m_remote[i].peer == e.peer) {
+					m_remote[i].connected = false;
+				}
+			}
+		}
+	}
+	if (m_hostPeer != NO_PEER && !isHost()) {
+		return false;
+	}
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		if (isHost() && m_remote[i].connected) {
+			return false;
+		}
+	}
+	return true;
+}
+
 // ================================================================================================
 // Chat and files
 // ================================================================================================
@@ -537,7 +570,9 @@ void Session::announceFile(uint32_t id, const std::string &name, uint32_t totalS
 		w.str(name);
 		w.u32(totalSize);
 		w.u32(mask);
-		deliverBulk(m_config.localSlot, mask, w, Event(Event::FILE_ANNOUNCE));
+		// Everyone hears about it (every map transfer screen shows every player's progress); only
+		// the recipients get the data.
+		deliverBulk(m_config.localSlot, ALL_PLAYERS, w, Event(Event::FILE_ANNOUNCE));
 	} else {
 		ByteWriter w;
 		w.u8(MSG_FILE_ANNOUNCE);
@@ -573,19 +608,17 @@ void Session::sendFileData(uint32_t id, uint32_t offset, const std::vector<uint8
 	}
 }
 
-void Session::sendFileProgress(int senderSlot, uint32_t id, int percent)
+void Session::sendFileProgress(int, uint32_t id, int percent)
 {
+	// Everyone shows everyone's progress (the map transfer screen), so it goes to all players.
 	ByteWriter w;
 	w.u8(MSG_FILE_PROGRESS);
+	w.u8(m_config.localSlot);
+	w.u32(id);
+	w.u8(percent);
 	if (isHost()) {
-		w.u8(m_config.localSlot);	// who reports
-		w.u32(id);
-		w.u8(percent);
-		sendTo(senderSlot, CHANNEL_BULK, w);
+		broadcast(CHANNEL_BULK, w);
 	} else {
-		w.u8(senderSlot);			// whom to tell
-		w.u32(id);
-		w.u8(percent);
 		sendToHost(CHANNEL_BULK, w);
 	}
 }
@@ -817,7 +850,7 @@ void Session::hostHandle(int slot, uint32_t type, ByteReader &r, uint32_t nowMs)
 			e.name = name;
 			e.value = (int)size;
 			e.mask = mask;
-			deliverBulk(slot, mask, w, e);
+			deliverBulk(slot, ALL_PLAYERS, w, e);	// everyone; the data only to the recipients
 			break;
 		}
 
@@ -844,24 +877,21 @@ void Session::hostHandle(int slot, uint32_t type, ByteReader &r, uint32_t nowMs)
 		}
 
 		case MSG_FILE_PROGRESS: {
-			uint32_t sender = r.u8();
+			r.u8();		// the reporter's slot: we know it from the connection
 			uint32_t id = r.u32();
 			uint32_t percent = r.u8();
-			if (!r.ok() || sender >= MAX_PLAYERS) return;
-			if ((int)sender == m_config.localSlot) {
-				Event e(Event::FILE_PROGRESS);
-				e.slot = slot;
-				e.id = id;
-				e.value = (int)percent;
-				push(e);
-			} else {
-				ByteWriter w;
-				w.u8(MSG_FILE_PROGRESS);
-				w.u8(slot);
-				w.u32(id);
-				w.u8(percent);
-				sendTo((int)sender, CHANNEL_BULK, w);
-			}
+			if (!r.ok()) return;
+			Event e(Event::FILE_PROGRESS);
+			e.slot = slot;
+			e.id = id;
+			e.value = (int)percent;
+			push(e);
+			ByteWriter w;
+			w.u8(MSG_FILE_PROGRESS);
+			w.u8(slot);
+			w.u32(id);
+			w.u8(percent);
+			broadcast(CHANNEL_BULK, w, slot);
 			break;
 		}
 
@@ -1221,6 +1251,12 @@ void Session::hostUpdateWaiting(uint32_t nowMs)
 				rem.waitingSinceMs = nowMs ? nowMs : 1;
 			}
 			uint32_t ms = nowMs - rem.waitingSinceMs;
+			if (m_config.dropAfterMs && ms >= m_config.dropAfterMs) {
+				// Waited too long: the game goes on without it.
+				hostPlayerGone(i, LEAVE_DROPPED);
+				m_transport->disconnect(rem.peer);
+				continue;
+			}
 			if (ms >= WAITING_REPORT_MS) {
 				e.waitingMs[i] = ms;
 				any = true;
