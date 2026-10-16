@@ -26,7 +26,7 @@
 
 #include "Common/Recorder.h"
 #include "Common/FileSystem.h"
-#include "Common/playerlist.h"
+#include "Common/PlayerList.h"
 #include "Common/Player.h"
 #include "Common/GlobalData.h"
 #include "Common/GameEngine.h"
@@ -39,11 +39,11 @@
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/GameMessageParser.h"
 #include "GameNetwork/GameSpy/PeerDefs.h"
-#include "GameNetwork/NetworkUtil.h"
+#include "GameNetwork/networkutil.h"
 #include "GameLogic/GameLogic.h"
 #include "Common/RandomValue.h"
 #include "Common/CRCDebug.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -52,6 +52,44 @@
 #endif
 
 Int REPLAY_CRC_INTERVAL = 100;
+
+Bool TheReplayCheckMode = FALSE;
+Int TheReplayCheckExitCode = 0;
+static Int s_replayCheckCRCsCompared = 0;
+static Int s_replayCheckMismatchFrame = -1;
+static Bool s_replayCheckDone = FALSE;
+static AsciiString s_replayCheckFile;
+
+/**
+ * Ends a replay check: logs the result, sets the process exit code and quits the game.
+ */
+void ReplayCheckFinish(ReplayCheckResult result)
+{
+	if (!TheReplayCheckMode || s_replayCheckDone)
+		return;
+	s_replayCheckDone = TRUE;
+
+	if (result == REPLAYCHECK_PASS && s_replayCheckCRCsCompared == 0)
+		result = REPLAYCHECK_NO_CRCS;
+
+	static const char *const names[] = { "PASS", "MISMATCH", "NO_CRCS", "LOAD_FAILED" };
+	AsciiString logName;
+	logName.format("%sReplayCheck.txt", TheGlobalData->getPath_UserData().str());
+	FILE *log = fopen(logName.str(), "a");
+	if (log)
+	{
+		fprintf(log, "%s\t%s\tframe=%d\tcrcs_compared=%d",
+			names[result], s_replayCheckFile.str(), TheGameLogic ? (Int)TheGameLogic->getFrame() : 0,
+			s_replayCheckCRCsCompared);
+		if (result == REPLAYCHECK_MISMATCH)
+			fprintf(log, "\tfirst_mismatch_frame=%d", s_replayCheckMismatchFrame);
+		fprintf(log, "\n");
+		fclose(log);
+	}
+
+	TheReplayCheckExitCode = result;
+	TheGameEngine->setQuitting(TRUE);
+}
 
 const char *replayExtention = ".rep";
 const char *lastReplayFileName = "00000000";	// a name the user is unlikely to ever type, but won't cause panic & confusion
@@ -465,6 +503,12 @@ void RecorderClass::stopPlayback() {
 		m_file = NULL;
 	}
 	m_fileName.clear();
+	// A replay check ends here, at the end of the file.
+	if (TheReplayCheckMode && !m_doingAnalysis)
+	{
+		ReplayCheckFinish(REPLAYCHECK_PASS);
+		return;
+	}
 	// Don't clear the game data if the replay is over - let things continue
 //#ifdef DEBUG_CRC
 	if (!m_doingAnalysis)
@@ -815,8 +859,11 @@ void RecorderClass::writeArgument(GameMessageArgumentDataType type, const GameMe
  */
 Bool RecorderClass::readReplayHeader(ReplayHeader& header)
 {
-	AsciiString filepath = getReplayDir();
-	filepath.concat(header.filename.str());
+	// Names are relative to the replay directory; absolute paths (C:\..., \\server\...) are used as they are.
+	const char *name = header.filename.str();
+	Bool absolute = (name[0] && name[1] == ':') || (name[0] == '\\' && name[1] == '\\');
+	AsciiString filepath = absolute ? AsciiString::TheEmptyString : getReplayDir();
+	filepath.concat(name);
 	m_file = fopen(filepath.str(), "rb");
 	if (m_file == NULL)
 	{
@@ -997,6 +1044,18 @@ void RecorderClass::handleCRCMessage(UnsignedInt newCRC, Int playerIndex, Bool f
 	if (samePlayer || (localPlayerIndex < 0))
 	{
 		UnsignedInt playbackCRC = m_crcInfo->readCRC();
+		if (TheReplayCheckMode && TheGameLogic->getFrame() > 0)
+		{
+			if (newCRC == playbackCRC)
+			{
+				++s_replayCheckCRCsCompared;
+			}
+			else
+			{
+				s_replayCheckMismatchFrame = TheGameLogic->getFrame();
+				ReplayCheckFinish(REPLAYCHECK_MISMATCH);
+			}
+		}
 		//DEBUG_LOG(("RecorderClass::handleCRCMessage() - Comparing CRCs of %8.8X/%8.8X from %d\n", newCRC, playbackCRC, playerIndex));
 		if (TheGameLogic->getFrame() > 0 && newCRC != playbackCRC && !m_crcInfo->sawCRCMismatch())
 		{
@@ -1061,6 +1120,8 @@ Bool RecorderClass::playbackFile(AsciiString filename)
 	}
 
 	m_mode = RECORDERMODETYPE_PLAYBACK;
+	if (TheReplayCheckMode && !m_doingAnalysis)
+		s_replayCheckFile = filename;
 
 	ReplayHeader header;
 	header.forPlayback = TRUE;
@@ -1165,7 +1226,7 @@ Bool RecorderClass::playbackFile(AsciiString filename)
  * Read a unicode string from the current file position. The string is assumed to be 0-terminated.
  */
 UnicodeString RecorderClass::readUnicodeString() {
-	UnsignedShort str[1024] = L"";
+	WideChar str[1024] = L"";	// was UnsignedShort: Visual C++ 6 treated wchar_t as unsigned short
 	Int index = 0;
 
 	Int c = fgetwc(m_file);

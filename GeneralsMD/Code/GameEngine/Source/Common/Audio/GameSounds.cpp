@@ -44,7 +44,7 @@
 //----------------------------------------------------------------------------
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 
-#include "Lib/Basetype.h"
+#include "Lib/BaseType.h"
 #include "Common/GameSounds.h"
 
 #include "Common/AudioEventInfo.h"
@@ -217,7 +217,7 @@ Bool SoundManager::canPlayNow( AudioEventRTS *event )
 	// if so, kill them and start our sound
 	// if not, we're done. Can't play dude.
 	
-	if( event->isPositionalAudio() && !BitTest( event->getAudioEventInfo()->m_type, ST_GLOBAL) && event->getAudioEventInfo()->m_priority != AP_CRITICAL ) 
+	if( event->isPositionalAudio() && !BitIsSet( event->getAudioEventInfo()->m_type, ST_GLOBAL) && event->getAudioEventInfo()->m_priority != AP_CRITICAL ) 
 	{
 		Coord3D distance = *TheAudio->getListenerPosition();
 		const Coord3D *pos = event->getCurrentPosition();

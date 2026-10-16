@@ -39,21 +39,21 @@
 
 #include <string.h>	// stricmp()
 #include "animatedsoundmgr.h"
-#include "ini.h"
+#include "INI.H"
 #include "inisup.h"
 #include "ffactory.h"
-#include "wwfile.h"
+#include "WWFILE.H"
 #include <stdio.h>
 #include "definition.h"
 #include "definitionmgr.h"
 #include "definitionclassids.h"
-#include "wwaudio.h"
-#include "audiblesound.h"
+// (wwaudio.h / audiblesound.h were included here but nothing from them is used; they pull in
+// the Miles Sound System SDK.)
 #include "htree.h"
 #include "hanim.h"
 #include "soundlibrarybridge.h"
 
-#include "WWDebug.h"
+#include "wwdebug.h"
 
 //////////////////////////////////////////////////////////////////////
 //	Static member initialization
@@ -114,7 +114,8 @@ Build_List_From_String
 		//
 		// Determine how many entries there will be in the list
 		//
-		for (const char *entry = buffer;
+		const char * entry;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (entry = buffer;
 			  (entry != NULL) && (entry[1] != 0);
 			  entry = ::strstr (entry, delimiter))
 		{

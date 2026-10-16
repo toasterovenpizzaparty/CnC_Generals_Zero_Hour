@@ -53,7 +53,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 
 #include "Common/GlobalData.h"
-#include "Common/Encrypt.h"
+#include "Common/encrypt.h"
 #include "Common/NameKeyGenerator.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Gadget.h"
@@ -291,7 +291,7 @@ WindowMsgHandledType PopupLadderSelectInput( GameWindow *window, UnsignedInt msg
 					// send a simulated selected event to the parent window of the
 					// back/exit button
 					//
-					if( BitTest( state, KEY_STATE_UP ) )
+					if( BitIsSet( state, KEY_STATE_UP ) )
 					{
 						switch (s_currentMode)
 						{
@@ -557,7 +557,8 @@ static void updateLadderDetails( Int selID, GameWindow *staticTextLadderName, Ga
 
 	// factions
 	AsciiStringList validFactions = info->validFactions;
-	for (AsciiStringListIterator it = validFactions.begin(); it != validFactions.end(); ++it)
+	AsciiStringListIterator it;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (it = validFactions.begin(); it != validFactions.end(); ++it)
 	{
 		AsciiString marker;
 		marker.format("INI:Faction%s", it->str());
@@ -576,7 +577,7 @@ static void updateLadderDetails( Int selID, GameWindow *staticTextLadderName, Ga
 
 	// maps
 	AsciiStringList validMaps = info->validMaps;
-	for (it = validMaps.begin(); it != validMaps.end(); ++it)
+	for (AsciiStringList::iterator it = validMaps.begin(); it != validMaps.end(); ++it)
 	{
 		const MapMetaData *md = TheMapCache->findMap(*it);
 		if (md)

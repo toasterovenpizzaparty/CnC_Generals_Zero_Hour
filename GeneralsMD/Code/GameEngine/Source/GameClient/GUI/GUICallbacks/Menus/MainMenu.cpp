@@ -39,7 +39,7 @@
 #include "Common/NameKeyGenerator.h"
 #include "Common/RandomValue.h"
 #include "Common/UserPreferences.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 #include "Common/GameLOD.h"
 #include "GameClient/AnimateWindowManager.h"
 #include "GameClient/ExtendedMessageBox.h"
@@ -197,7 +197,7 @@ enum
 	SHOW_FRAMES_LIMIT = 20
 };
 
-static showFade = FALSE;
+static int showFade = FALSE;
 static Int dropDown = DROPDOWN_NONE;
 static Int pendingDropDown = DROPDOWN_NONE;
 static AnimateWindowManager *localAnimateWindowManager = NULL;
@@ -214,7 +214,7 @@ static Bool launchChallengeMenu = FALSE;
 static Bool dontAllowTransitions = FALSE;
 
 //Added by Saad
-const /*Int TIME_OUT = 15,*/ CORNER = 10;
+const /*Int TIME_OUT = 15,*/ int CORNER = 10;
 void AcceptResolution();
 void DeclineResolution();
 GameWindow *resAcceptMenu = NULL;
@@ -462,7 +462,8 @@ void MainMenuInit( WindowLayout *layout, void *userData )
 	startGame = FALSE;
 	dropDown = DROPDOWN_NONE;
 	pendingDropDown = DROPDOWN_NONE;
-	for(Int i = 0; i < DROPDOWN_COUNT; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for(i = 0; i < DROPDOWN_COUNT; ++i)
 		dropDownWindows[i] = NULL;
 
 	// get ids for our windows

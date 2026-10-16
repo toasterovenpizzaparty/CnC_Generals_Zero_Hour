@@ -111,10 +111,10 @@
 #include "dx8renderer.h"
 #include "metalmap.h"
 #include "w3dexclusionlist.h"
-#include <ini.h>
+#include <INI.H>
 #include <windows.h>
 #include <stdio.h>
-#include <D3dx8core.h>
+#include <d3dx8core.h>
 #include "texture.h"
 #include "wwprofile.h"
 #include "assetstatus.h"
@@ -540,7 +540,8 @@ void WW3DAssetManager::Free_Assets_With_Exclusion_List(const DynamicVectorClass<
 	exclude_array.Set_Growth_Step(DEFAULT_EXCLUDE_ARRAY_SIZE);
 
 	// iterate the array of prototypes saving each one that should be excluded from deletion
-	for (int i=0; i<Prototypes.Count(); i++) {
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<Prototypes.Count(); i++) {
 
 		PrototypeClass * proto = Prototypes[i];
 		if (proto != NULL) {		

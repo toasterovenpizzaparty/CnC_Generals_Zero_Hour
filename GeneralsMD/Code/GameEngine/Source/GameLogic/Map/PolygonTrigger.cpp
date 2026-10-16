@@ -310,7 +310,8 @@ void PolygonTrigger::addPolygonTrigger(PolygonTrigger *pTrigger)
 void PolygonTrigger::removePolygonTrigger(PolygonTrigger *pTrigger)
 {	
 	PolygonTrigger *pPrev = NULL;
-	for (PolygonTrigger *pTrig=getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
+	PolygonTrigger * pTrig;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (pTrig=getFirstPolygonTrigger(); pTrig; pTrig = pTrig->getNext()) {
 		if (pTrig==pTrigger) break;
 		pPrev = pTrig;
 	}

@@ -416,7 +416,8 @@ void SinglePlayerLoadScreen::init( GameInfo *game )
 	
 	Mission *mission = TheCampaignManager->getCurrentMission();
 	AsciiString lineName;
-	for(Int i = 0; i < MAX_OBJECTIVE_LINES; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for(i = 0; i < MAX_OBJECTIVE_LINES; ++i)
 	{
 		lineName.format("SinglePlayerLoadScreen.wnd:StaticTextLine%d",i);
 		m_objectiveLines[i] = TheWindowManager->winGetWindowFromId( m_loadScreen,TheNameKeyGenerator->nameToKey( lineName ));
@@ -1305,7 +1306,8 @@ MultiPlayerLoadScreen::MultiPlayerLoadScreen( void )
 	
 MultiPlayerLoadScreen::~MultiPlayerLoadScreen( void )
 {
-	for(Int i = 0; i < MAX_SLOTS; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for(i = 0; i < MAX_SLOTS; ++i)
 	{
 		m_progressBars[i] = NULL;
 		m_playerNames[i] = NULL;
@@ -1388,7 +1390,8 @@ void MultiPlayerLoadScreen::init( GameInfo *game )
 	//DEBUG_LOG(("NumPlayers %d\n", TheNetwork->getNumPlayers()));
 
 	GameWindow *teamWin[MAX_SLOTS];
-	for (Int i = 0; i < MAX_SLOTS; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i)
 	{
 		teamWin[i] = NULL;
 	}
@@ -1572,7 +1575,8 @@ GameSpyLoadScreen::GameSpyLoadScreen( void )
 	
 GameSpyLoadScreen::~GameSpyLoadScreen( void )
 {
-	for(Int i = 0; i < MAX_SLOTS; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for(i = 0; i < MAX_SLOTS; ++i)
 	{
 		m_progressBars[i] = NULL;
 		m_playerNames[i] = NULL;
@@ -1640,7 +1644,8 @@ GameSlot *lSlot = game->getSlot(game->getLocalSlotNum());
 	GadgetStaticTextSetText( m_nameLocalGeneral, localName );
 
 	GameWindow *teamWin[MAX_SLOTS];
-	for (Int i = 0; i < MAX_SLOTS; ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i)
 	{
 		teamWin[i] = NULL;
 	}

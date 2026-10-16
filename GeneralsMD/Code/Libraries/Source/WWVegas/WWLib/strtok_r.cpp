@@ -39,6 +39,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#if !defined(_UNIX) && !defined(__MINGW32__)	// otherwise the C runtime provides it
+
+
 //
 // Replacement for strtok() that doesn't use a static to
 //   store the current position.  The name comes from the
@@ -84,4 +87,6 @@ char *strtok_r(char *strptr, const char *delimiters, char **lasts)
 	}
 	return(retval);
 }
+#endif
+
 #endif

@@ -34,7 +34,7 @@
 #include "Common/GameEngine.h"
 #include "Common/MultiplayerSettings.h"
 #include "Common/PlayerTemplate.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 #include "GameClient/AnimateWindowManager.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Gadget.h"
@@ -70,7 +70,7 @@
 
 // PRIVATE DATA ///////////////////////////////////////////////////////////////////////////////////
 // Note: if you add more columns, you must modify the .wnd files and change the listbox properties (yuck!)
-static enum {
+enum {
 	COLUMN_NAME = 0,
 	COLUMN_MAP,
 	COLUMN_LADDER,

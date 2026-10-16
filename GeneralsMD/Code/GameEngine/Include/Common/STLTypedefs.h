@@ -64,9 +64,9 @@ class STLSpecialAlloc;
 
 // FORWARD DECLARATIONS
 class Object;
-enum NameKeyType;
-enum ObjectID;
-enum DrawableID;
+enum NameKeyType : int;
+enum ObjectID : int;
+enum DrawableID : int;
 
 #include <algorithm>
 #include <bitset>
@@ -192,8 +192,8 @@ namespace rts
 	{
 		size_t operator()(AsciiString ast) const
 		{ 
-			std::hash<const char *> tmp;
-			return tmp((const char *) ast.str());
+			// hash the characters (STLport's hash<const char*> did; std::hash hashes the pointer)
+			return zh::hash_cstring(ast.str());
 		}
 	};
 

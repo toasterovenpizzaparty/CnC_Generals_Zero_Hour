@@ -110,7 +110,8 @@ The script prints the first differing byte and the labels in front of it (object
     g++ -O2 -I../../GameEngine/Include networktiming_test.cpp -o networktiming_test && ./networktiming_test
 
 On Windows, build the same files with `cl /O2 /fp:precise`. The DetMath hash must be
-`ba0d1902ead0e3eb` on every machine and compiler.
+`ba0d1902ead0e3eb` on every machine and compiler. CI checks this with GCC and Clang on Linux, and
+with MSVC and MinGW (32 and 64-bit) on Windows.
 
 ## Testing in the real game
 
@@ -122,9 +123,11 @@ often the game freezes.
 
 ## Not done yet
 
-- **Not compiled here.** The game needs Win32 and proprietary SDKs. The new headers and the test
-  programs compile and pass; the edits to the game's `.cpp` files were reviewed but must be built
-  on Windows.
+- **Not tested in a real game yet.** The game now builds with GCC (see [BUILDING.md](BUILDING.md)),
+  and the test programs pass on Linux and Windows, but nobody has played a LAN game with these
+  changes yet.
+- **The network layer itself is old.** These are fixes inside the original design. Next, the plan
+  is to replace it for LAN play: the host sequences turns, over a maintained UDP library.
 - **The packet router is still always slot 0 (the host).** Let the player with the best
   connection host.
 - **16 uses of `GameClientRandomValue` inside `GameLogic` were not audited.** The client-side

@@ -88,7 +88,7 @@ public:
 		const T &	Get_Value (void) const		{ return m_Value; }
 		T &			Get_Value (void)				{ return m_Value; }
 
-		float			Set_Time (float time)		{ m_Time = time; }
+		void			Set_Time (float time)		{ m_Time = time; }	// returned nothing despite 'float' (undefined behaviour)
 		void			Set_Value (const T &value)	{ m_Value = value; }
 
 	private:
@@ -160,6 +160,12 @@ protected:
 template<class T>
 class LERPAnimationChannelClass : public PrimitiveAnimationChannelClass<T>
 {
+protected:
+	// dependent base class members (standard two-phase lookup)
+	typedef typename PrimitiveAnimationChannelClass<T>::KeyClass KeyClass;
+	using PrimitiveAnimationChannelClass<T>::m_Data;
+	using PrimitiveAnimationChannelClass<T>::m_LastIndex;
+
 public:
 
 	/////////////////////////////////////////////////////////
@@ -182,7 +188,7 @@ int PrimitiveAnimationChannelClass<T>::Get_Key_Count (void) const
 //	Set_Key_Value
 /////////////////////////////////////////////////////////
 template<class T>
-const PrimitiveAnimationChannelClass<T>::KeyClass &PrimitiveAnimationChannelClass<T>::Get_Key (int index) const
+const typename PrimitiveAnimationChannelClass<T>::KeyClass &PrimitiveAnimationChannelClass<T>::Get_Key (int index) const
 {
 	return m_Data[index];
 }

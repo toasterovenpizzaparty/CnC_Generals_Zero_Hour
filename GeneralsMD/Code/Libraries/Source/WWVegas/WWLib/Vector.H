@@ -486,7 +486,16 @@ bool VectorClass<T>::Resize(int newsize, T const * array)
 template<class T>
 class DynamicVectorClass : public VectorClass<T>
 {
+	protected:
+		// Members of the dependent base class must be named explicitly for standard two-phase lookup.
+		using VectorClass<T>::Vector;
+		using VectorClass<T>::VectorMax;
+		using VectorClass<T>::IsValid;
+		using VectorClass<T>::IsAllocated;
+
 	public:
+		using VectorClass<T>::Length;
+
 		DynamicVectorClass(unsigned size=0, T const * array=0);
 
 		// Stubbed equality operators so you can have dynamic vectors of dynamic vectors

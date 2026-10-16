@@ -48,7 +48,11 @@
 #include "W3DDevice/GameClient/W3DGameWindowManager.h"
 #include "W3DDevice/GameClient/W3DGameFont.h"
 #include "W3DDevice/GameClient/W3DDisplayStringManager.h"
+#if ZH_USE_BINK
 #include "VideoDevice/Bink/BinkVideoPlayer.h"
+#else
+#include "GameClient/VideoPlayer.h"
+#endif
 #include "Win32Device/GameClient/Win32DIKeyboard.h"
 #include "Win32Device/GameClient/Win32DIMouse.h"
 #include "Win32Device/GameClient/Win32Mouse.h"
@@ -112,7 +116,12 @@ protected:
   /// Manager for display strings
 	virtual DisplayStringManager *createDisplayStringManager( void ) { return NEW W3DDisplayStringManager; }
 
+#if ZH_USE_BINK
 	virtual VideoPlayerInterface *createVideoPlayer( void ) { return NEW BinkVideoPlayer; }
+#else
+	// Built without the Bink SDK: the base VideoPlayer plays no videos.
+	virtual VideoPlayerInterface *createVideoPlayer( void ) { return NEW VideoPlayer; }
+#endif
 	/// factory for creating the TerrainVisual
 	virtual TerrainVisual *createTerrainVisual( void ) { return NEW W3DTerrainVisual; }
 

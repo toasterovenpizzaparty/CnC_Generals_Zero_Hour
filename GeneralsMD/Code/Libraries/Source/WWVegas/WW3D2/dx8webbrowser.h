@@ -39,7 +39,12 @@
 // ***********************************
 // Set this to 0 to remove all embedded browser code.
 //
+// The embedded browser (online lobby pages) uses MSVC's #import of BrowserEngine.dll.
+#if defined(_MSC_VER)
 #define ENABLE_EMBEDDED_BROWSER		1
+#else
+#define ENABLE_EMBEDDED_BROWSER		0
+#endif
 //
 // ***********************************
 

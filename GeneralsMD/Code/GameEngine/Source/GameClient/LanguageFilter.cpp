@@ -27,7 +27,7 @@
 
 #include "GameClient/LanguageFilter.h"
 #include "Common/FileSystem.h"
-#include "Common/File.h"
+#include "Common/file.h"
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -159,7 +159,7 @@ void LanguageFilter::unHaxor(UnicodeString &word) {
 }
 
 // returning true means that there are more words in the file.
-Bool LanguageFilter::readWord(File *file1, UnsignedShort *buf) {
+Bool LanguageFilter::readWord(File *file1, WideChar *buf) {
 	Int index = 0;
 	Bool retval = TRUE;
 	Int val = 0;

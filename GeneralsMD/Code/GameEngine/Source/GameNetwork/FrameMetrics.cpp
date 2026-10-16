@@ -28,7 +28,7 @@
 
 #include "GameNetwork/FrameMetrics.h"
 #include "GameClient/Display.h"
-#include "GameNetwork/NetworkUtil.h"
+#include "GameNetwork/networkutil.h"
 
 FrameMetrics::FrameMetrics() 
 {
@@ -73,7 +73,8 @@ void FrameMetrics::init() {
 	m_latencyEstimator.reset();
 	m_minimumCushion = -1;
 
-	for (Int i = 0; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < TheGlobalData->m_networkFPSHistoryLength; ++i) {
 		m_fpsList[i] = 30.0;
 	}
 	m_fpsListIndex = 0;

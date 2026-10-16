@@ -29,6 +29,7 @@
 #include "PreRTS.h"	// This must go first in EVERY cpp file int the GameEngine
 
 #include "Common/PerfTimer.h"
+#include "zh_intrin.h"
 
 #include "Common/GlobalData.h"
 #include "GameClient/DebugDisplay.h"
@@ -37,17 +38,7 @@
 
 __forceinline void ProfileGetTime(__int64 &t)
 {
-  _asm
-  {
-    mov ecx,[t]
-    push eax
-    push edx
-    rdtsc
-    mov [ecx],eax
-    mov [ecx+4],edx
-    pop edx
-    pop eax
-  };
+  t = (__int64)ZH_Rdtsc();	// was RDTSC inline assembly
 }
 
 #ifdef _INTERNAL

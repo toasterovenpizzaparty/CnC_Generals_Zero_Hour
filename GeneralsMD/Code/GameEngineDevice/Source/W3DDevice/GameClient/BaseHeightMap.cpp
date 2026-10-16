@@ -82,9 +82,9 @@
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "W3DDevice/GameClient/W3DWater.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
-#include "WW3D2/DX8Wrapper.h"
-#include "WW3D2/Light.h"
-#include "WW3D2/Scene.h"
+#include "WW3D2/dx8wrapper.h"
+#include "WW3D2/light.h"
+#include "WW3D2/scene.h"
 #include "W3DDevice/GameClient/W3DPoly.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
 
@@ -1671,7 +1671,8 @@ void BaseHeightMapRenderObjClass::updateShorelineTiles(Int minX, Int minY, Int m
 	}
 	
 	//First remove any existing extra blend tiles within this partial region
-	for (Int j=0; j<m_numShoreLineTiles; j++)
+	Int j;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (j=0; j<m_numShoreLineTiles; j++)
 	{	Int x = m_shoreLineTilePositions[j].m_xy & 0xffff;
 		Int y = m_shoreLineTilePositions[j].m_xy >> 16;
 		if (x >= minX && x < maxX &&
@@ -2699,7 +2700,8 @@ void BaseHeightMapRenderObjClass::renderShoreLinesSorted(CameraClass *pCamera)
 			//Loop over visible terrain and extract all the tiles that need shoreline blend
 			if (m_shoreLineSortInfosXMajor)	//map is wider than taller.
 			{	
-				for (Int x=drawStartX; x<drawEdgeX; x++)
+				Int x;	// hoisted: was visible after the loop under VC6 scoping rules
+				for (x=drawStartX; x<drawEdgeX; x++)
 				{	//figure out how many tiles are available in this column
 					shoreLineTileSortInfo *sortInfo=&m_shoreLineSortInfos[x];
 
@@ -2819,7 +2821,8 @@ flushVertexBuffer0:
 			}
 			else
 			{
-				for (Int y=drawStartY; y<drawEdgeY; y++)
+				Int y;	// hoisted: was visible after the loop under VC6 scoping rules
+				for (y=drawStartY; y<drawEdgeY; y++)
 				{	//figure out how many tiles are available in this row
 					shoreLineTileSortInfo *sortInfo=&m_shoreLineSortInfos[y];
 

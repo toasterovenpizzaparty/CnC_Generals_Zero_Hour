@@ -34,7 +34,7 @@
 #include <limits.h>
 
 #include "Lib/BaseType.h"
-#include "Lib/Trig.h"
+#include "Lib/trig.h"
 
 #define TWOPI			6.28318530718f
 #define DEG2RAD 	0.0174532925199f

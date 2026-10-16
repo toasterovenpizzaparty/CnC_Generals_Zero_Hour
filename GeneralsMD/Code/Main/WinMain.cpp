@@ -42,6 +42,7 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "WinMain.h"
 #include "Lib/BaseType.h"
+#include "Common/Recorder.h"
 #include "Common/CopyProtection.h"
 #include "Common/CriticalSection.h"
 #include "Common/GlobalData.h"
@@ -61,10 +62,10 @@
 #include "GameClient/IMEManager.h"
 #include "Win32Device/GameClient/Win32Mouse.h"
 #include "Win32Device/Common/Win32GameEngine.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 #include "BuildVersion.h"
 #include "GeneratedVersion.h"
-#include "Resource.h"
+#include "resource.h"
 
 #include <rts/profile.h>
 
@@ -777,40 +778,8 @@ void checkProtection(void)
 #endif
 }
 
-// strtrim ====================================================================
-/** Trim leading and trailing whitespace from a character string (in place). */
-//=============================================================================
-static char* strtrim(char* buffer)
-{
-	if (buffer != NULL) {
-		//	Strip leading white space from the string.
-		char * source = buffer;
-		while ((*source != 0) && ((unsigned char)*source <= 32))
-		{
-			source++;
-		}
-
-		if (source != buffer)
-		{
-			strcpy(buffer, source);
-		}
-
-		//	Clip trailing white space from the string.
-		for (int index = strlen(buffer)-1; index >= 0; index--)
-		{
-			if ((*source != 0) && ((unsigned char)buffer[index] <= 32))
-			{
-				buffer[index] = '\0';
-			}
-			else
-			{
-				break;
-			}
-		}
-	}
-
-	return buffer;
-}
+// strtrim: uses the identical WWLib implementation (trim.h); a second copy here clashed at link time.
+#include "trim.h"
 
 char *nextParam(char *newSource, char *seps)
 {
@@ -924,7 +893,7 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 		while (argc < 20 && token != NULL) {
 			argv[argc++] = strtrim(token);
 			//added a preparse step for this flag because it affects window creation style
-			if (stricmp(token,"-win")==0)
+			if (stricmp(token,"-win")==0 || stricmp(token,"-replayCheck")==0)
 				ApplicationIsWindowed=true;
 			token = nextParam(NULL, "\" ");	   
 		}
@@ -1097,7 +1066,7 @@ Int APIENTRY WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 	TheDmaCriticalSection = NULL;
 	TheMemoryPoolCriticalSection = NULL;
 
-	return 0;
+	return TheReplayCheckExitCode;	// 0 unless -replayCheck found a problem
 
 }  // end WinMain
 

@@ -86,7 +86,7 @@
 #endif
 
 #ifdef PM_CACHE_TERRAIN_HEIGHT
-#include "common/mapobject.h"
+#include "Common/MapObject.h"
 #endif
 
 #ifdef DUMP_PERF_STATS
@@ -3757,7 +3757,7 @@ Bool PartitionManager::tryPosition( const Coord3D *center,
 		{
 			return FALSE;
 		}
-		if( BitTest(options->flags, FPF_CLEAR_CELLS_ONLY) && cell->getType() != PathfindCell::CELL_CLEAR )
+		if( BitIsSet(options->flags, FPF_CLEAR_CELLS_ONLY) && cell->getType() != PathfindCell::CELL_CLEAR )
 			return FALSE;
 
 	}
@@ -3766,7 +3766,7 @@ Bool PartitionManager::tryPosition( const Coord3D *center,
 	// we don't usually find positions in the water unless we explicitly say that's OK,
 	// or if the option is set we can only pick position underwater
 	//
-	if( BitTest( options->flags, FPF_IGNORE_WATER ) == FALSE )
+	if( BitIsSet( options->flags, FPF_IGNORE_WATER ) == FALSE )
 	{
 		Bool isUnderwater = TheTerrainLogic->isUnderwater( pos.x, pos.y );
 
@@ -3774,7 +3774,7 @@ Bool PartitionManager::tryPosition( const Coord3D *center,
 		// if we want water spots only and this is underwater it's no good, otherwise we want
 		// the default behavior where underwater spots are invalid
 		//
-		if( BitTest( options->flags, FPF_WATER_ONLY ) && (isUnderwater == FALSE || layer != LAYER_GROUND) )
+		if( BitIsSet( options->flags, FPF_WATER_ONLY ) && (isUnderwater == FALSE || layer != LAYER_GROUND) )
 			return FALSE;
 		else if( isUnderwater == TRUE && layer == LAYER_GROUND )
 			return FALSE;
@@ -3782,7 +3782,7 @@ Bool PartitionManager::tryPosition( const Coord3D *center,
 	}  // end if
 
 	// object checks
-	if( BitTest( options->flags, FPF_IGNORE_ALL_OBJECTS ) == FALSE )
+	if( BitIsSet( options->flags, FPF_IGNORE_ALL_OBJECTS ) == FALSE )
 	{
 
 		//
@@ -3806,25 +3806,25 @@ Bool PartitionManager::tryPosition( const Coord3D *center,
 			{
 
 				// if this is an ally/neutral unit and we ignore those, do so
-				if( BitTest( options->flags, FPF_IGNORE_ALLY_OR_NEUTRAL_UNITS ) == TRUE &&
+				if( BitIsSet( options->flags, FPF_IGNORE_ALLY_OR_NEUTRAL_UNITS ) == TRUE &&
 						options->relationshipObject->getRelationship( them ) != ENEMIES &&
 						(them->isKindOf( KINDOF_INFANTRY ) || them->isKindOf( KINDOF_VEHICLE )) )
 					continue;
 
 				// if this is an ally/neutral structure and we ignore those, do so
-				if( BitTest( options->flags, FPF_IGNORE_ALLY_OR_NEUTRAL_STRUCTURES ) == TRUE &&
+				if( BitIsSet( options->flags, FPF_IGNORE_ALLY_OR_NEUTRAL_STRUCTURES ) == TRUE &&
 						options->relationshipObject->getRelationship( them ) != ENEMIES &&
 						them->isKindOf( KINDOF_STRUCTURE ) )
 					continue;
 
 				// if this is an enemy unit and we ignore those, do so
-				if( BitTest( options->flags, FPF_IGNORE_ENEMY_UNITS ) == TRUE &&
+				if( BitIsSet( options->flags, FPF_IGNORE_ENEMY_UNITS ) == TRUE &&
 						options->relationshipObject->getRelationship( them ) == ENEMIES &&
 						(them->isKindOf( KINDOF_INFANTRY ) || them->isKindOf( KINDOF_VEHICLE )) )
 					continue;
 
 				// if this is an enemy structure and we ignore those, do so
-				if( BitTest( options->flags, FPF_IGNORE_ENEMY_STRUCTURES ) == TRUE &&
+				if( BitIsSet( options->flags, FPF_IGNORE_ENEMY_STRUCTURES ) == TRUE &&
 						options->relationshipObject->getRelationship( them ) == ENEMIES &&
 						them->isKindOf( KINDOF_STRUCTURE ) )
 					continue;
@@ -3903,8 +3903,8 @@ Bool PartitionManager::findPositionAround( const Coord3D *center,
 		return true;
 	}
 	// sanity, FPF_IGNORE_WATER and FPF_WATER_ONLY are mutually exclusive
-	DEBUG_ASSERTCRASH( !(BitTest( options->flags, FPF_IGNORE_WATER ) == TRUE &&
-										   BitTest( options->flags, FPF_WATER_ONLY ) == TRUE),
+	DEBUG_ASSERTCRASH( !(BitIsSet( options->flags, FPF_IGNORE_WATER ) == TRUE &&
+										   BitIsSet( options->flags, FPF_WATER_ONLY ) == TRUE),
 										 ("PartitionManager::findPositionAround - The options FPF_WATER_ONLY and FPF_IGNORE_WATER are mutually exclusive.  You cannot use them together\n") );
 
 	// pick a random angle from the center location to start at
@@ -3983,7 +3983,7 @@ void PartitionManager::doShroudReveal(Real centerX, Real centerY, Real radius, P
 		// Object's Look is the one who knows about allies.  Anyone can pask a player mask to me and all
 		// of those players will have an active looker applied to a bunch of cells
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			circle.drawCircle(hLineAddLooker, (void*)currentIndex);
 		}
@@ -4048,7 +4048,7 @@ void PartitionManager::undoShroudReveal(Real centerX, Real centerY, Real radius,
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			circle.drawCircle(hLineRemoveLooker, (void*)currentIndex);
 		}
@@ -4087,7 +4087,7 @@ void PartitionManager::doShroudCover(Real centerX, Real centerY, Real radius, Pl
 		// Object's Shroud is the one who knows about allies.  Anyone can pask a player mask to me and all
 		// of those players will have an active shrouder applied to a bunch of cells
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			circle.drawCircle(hLineAddShrouder, (void*)currentIndex);
 		}
@@ -4109,7 +4109,7 @@ void PartitionManager::undoShroudCover(Real centerX, Real centerY, Real radius, 
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			circle.drawCircle(hLineRemoveShrouder, (void*)currentIndex);
 		}
@@ -4141,7 +4141,7 @@ void PartitionManager::doThreatAffect( Real centerX, Real centerY, Real radius, 
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			parms.playerIndex = currentIndex;
 			circle.drawCircle(hLineAddThreat, &parms);
@@ -4174,7 +4174,7 @@ void PartitionManager::undoThreatAffect( Real centerX, Real centerY, Real radius
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			parms.playerIndex = currentIndex;
 			circle.drawCircle(hLineRemoveThreat, &parms);
@@ -4207,7 +4207,7 @@ void PartitionManager::doValueAffect( Real centerX, Real centerY, Real radius, U
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			parms.playerIndex = currentIndex;
 			circle.drawCircle(hLineAddValue, &parms);
@@ -4240,7 +4240,7 @@ void PartitionManager::undoValueAffect( Real centerX, Real centerY, Real radius,
 	for( Int currentIndex = ThePlayerList->getPlayerCount() - 1; currentIndex >=0; currentIndex-- )
 	{
 		const Player *currentPlayer = ThePlayerList->getNthPlayer( currentIndex );
-		if( BitTest( playerMask, currentPlayer->getPlayerMask() ) )
+		if( BitIsSet( playerMask, currentPlayer->getPlayerMask() ) )
 		{
 			parms.playerIndex = currentIndex;
 			circle.drawCircle(hLineRemoveValue, &parms);
@@ -4765,7 +4765,7 @@ void PartitionManager::getMostValuableLocation( Int playerIndex, UnsignedInt whi
 		Int cellValue = 0;
 
 		for (Int player = 0; player < MAX_PLAYER_COUNT; ++player) {
-			if (BitTest(allPlayerMasks[player], playerMask)) {
+			if (BitIsSet(allPlayerMasks[player], playerMask)) {
 				if (valType == VOT_CashValue) {
 					cellValue += m_cells[i].getCashValue(player);
 				} else {
@@ -5581,7 +5581,7 @@ static int cellValueProc(PartitionCell* cell, void* userData)
 
 	UnsignedInt val = 0;
 	for (Int i = 0; i < MAX_PLAYER_COUNT; ++i) {
-		if (BitTest(parms->allowedPlayersMasks, parms->allPlayersMask[i])) {
+		if (BitIsSet(parms->allowedPlayersMasks, parms->allPlayersMask[i])) {
 			if (parms->valueType == VOT_CashValue) {
 				val += cell->getCashValue(i);
 			} else {
@@ -5599,7 +5599,7 @@ static int cellValueProc(PartitionCell* cell, void* userData)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineAddLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
+void hLineAddLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5616,7 +5616,7 @@ static void hLineAddLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineRemoveLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
+void hLineRemoveLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5633,7 +5633,7 @@ static void hLineRemoveLooker(Int x1, Int x2, Int y, void *playerIndexVoid)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineAddShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
+void hLineAddShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5650,7 +5650,7 @@ static void hLineAddShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineRemoveShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
+void hLineRemoveShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5667,7 +5667,7 @@ static void hLineRemoveShrouder(Int x1, Int x2, Int y, void *playerIndexVoid)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineAddThreat(Int x1, Int x2, Int y, void *threatValueParms)
+void hLineAddThreat(Int x1, Int x2, Int y, void *threatValueParms)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5695,7 +5695,7 @@ static void hLineAddThreat(Int x1, Int x2, Int y, void *threatValueParms)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineRemoveThreat(Int x1, Int x2, Int y, void *threatValueParms)
+void hLineRemoveThreat(Int x1, Int x2, Int y, void *threatValueParms)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5723,7 +5723,7 @@ static void hLineRemoveThreat(Int x1, Int x2, Int y, void *threatValueParms)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineAddValue(Int x1, Int x2, Int y, void *threatValueParms)
+void hLineAddValue(Int x1, Int x2, Int y, void *threatValueParms)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;
@@ -5751,7 +5751,7 @@ static void hLineAddValue(Int x1, Int x2, Int y, void *threatValueParms)
 }
 
 // -----------------------------------------------------------------------------
-static void hLineRemoveValue(Int x1, Int x2, Int y, void *threatValueParms)
+void hLineRemoveValue(Int x1, Int x2, Int y, void *threatValueParms)
 {
 	if (y < 0 || y >= ThePartitionManager->m_cellCountY || x1 >= ThePartitionManager->m_cellCountX || x2 < 0)
 		return;

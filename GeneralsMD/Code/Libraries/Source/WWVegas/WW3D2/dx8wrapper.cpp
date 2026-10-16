@@ -71,7 +71,7 @@
 #include "missingtexture.h"
 #include "thread.h"
 #include <stdio.h>
-#include <D3dx8core.h>
+#include <d3dx8core.h>
 #include "pot.h"
 #include "wwprofile.h"
 #include "ffactory.h"
@@ -803,7 +803,8 @@ void DX8Wrapper::Enumerate_Devices()
 bool DX8Wrapper::Set_Any_Render_Device(void)
 {
 	// Then fullscreen
-	for (int dev_number = 0; dev_number < _RenderDeviceNameTable.Count(); dev_number++) {
+	int dev_number;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (dev_number = 0; dev_number < _RenderDeviceNameTable.Count(); dev_number++) {
 		if (Set_Render_Device(dev_number,-1,-1,-1,0,false)) {
 			return true;
 		}
@@ -1458,7 +1459,8 @@ bool DX8Wrapper::Find_Color_And_Z_Mode(int resx,int resy,int bitdepth,D3DFORMAT 
 	bool found = false;
 	unsigned int mode = 0;
 
-	for (int format_index=0; format_index < format_count; format_index++) {
+	int format_index;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (format_index=0; format_index < format_count; format_index++) {
 		found |= Find_Color_Mode(format_table[format_index],resx,resy,&mode);
 		if (found) break;
 	}
@@ -1689,7 +1691,9 @@ void DX8Wrapper::Begin_Scene(void)
 	
 	DX8CALL(BeginScene());
 
+#if ENABLE_EMBEDDED_BROWSER
 	DX8WebBrowser::Update();
+#endif
 }
 
 void DX8Wrapper::End_Scene(bool flip_frames)
@@ -1697,7 +1701,9 @@ void DX8Wrapper::End_Scene(bool flip_frames)
 	DX8_THREAD_ASSERT();
 	DX8CALL(EndScene());
 
+#if ENABLE_EMBEDDED_BROWSER
 	DX8WebBrowser::Render(0);
+#endif
 
 	if (flip_frames) {
 		DX8_Assert();
@@ -2244,7 +2250,8 @@ void DX8Wrapper::Apply_Render_State_Changes()
 	}
 
 	unsigned mask=TEXTURE0_CHANGED;
-	for (int i=0;i<CurrentCaps->Get_Max_Textures_Per_Pass();++i,mask<<=1) 
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0;i<CurrentCaps->Get_Max_Textures_Per_Pass();++i,mask<<=1) 
 	{
 		if (render_state_changed&mask) 
 		{
@@ -3085,7 +3092,8 @@ void DX8Wrapper::Set_Light_Environment(LightEnvironmentClass* light_env)
 		}
 
 		D3DLIGHT8 light;		
-		for (int l=0;l<light_count;++l) {
+		int l;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (l=0;l<light_count;++l) {
 			
 			::ZeroMemory(&light, sizeof(D3DLIGHT8));
 			

@@ -56,6 +56,7 @@
 	* OLEInitializer class - Init and shutdown OLE & COM as a global
 	* object.  Scary, nasty stuff, COM.  /me shivers.
 	*/
+#if ZH_HAS_ATL
 class OLEInitializer
 {
 public:
@@ -73,6 +74,9 @@ OLEInitializer g_OLEInitializer;
 CComModule _Module;
 
 CComObject<WebBrowser> * TheWebBrowser = NULL;
+#else
+WebBrowser * TheWebBrowser = NULL;
+#endif
 
 
 /******************************************************************************
@@ -91,8 +95,10 @@ CComObject<WebBrowser> * TheWebBrowser = NULL;
 *
 ******************************************************************************/
 
-WebBrowser::WebBrowser() :
-		mRefCount(1)
+WebBrowser::WebBrowser()
+#if ZH_HAS_ATL
+		: mRefCount(1)
+#endif
 {
 	DEBUG_LOG(("Instantiating embedded WebBrowser\n"));
 	m_urlList = NULL;
@@ -223,6 +229,7 @@ WebBrowserURL * WebBrowser::makeNewURL(AsciiString tag)
 	return newURL;
 }
 
+#if ZH_HAS_ATL
 /******************************************************************************
 *
 * NAME
@@ -313,3 +320,5 @@ STDMETHODIMP WebBrowser::TestMethod(Int num1)
 	DEBUG_LOG(("WebBrowser::TestMethod - num1 = %d\n", num1));
 	return S_OK;
 }
+
+#endif // ZH_HAS_ATL

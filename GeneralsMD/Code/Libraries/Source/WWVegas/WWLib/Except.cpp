@@ -47,15 +47,15 @@
  * Exception_Handler -- Exception handler filter function                                      *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 #include	"always.h"
 #include <windows.h>
 #include	"assert.h"
 #include "cpudetect.h"
-#include	"except.h"
+#include	"Except.h"
 //#include "debug.h"
-#include "mpu.h"
+#include "MPU.H"
 //#include "commando\nat.h"
 #include "thread.h"
 #include "wwdebug.h"
@@ -65,6 +65,28 @@
 #include	<imagehlp.h>
 #include <crtdbg.h>
 #include	<stdio.h>
+#include	<math.h>
+
+/*
+** Convert an x87 80-bit extended precision value (as stored in CONTEXT::FloatSave) to a double.
+** Only used to print register contents in the crash dump.
+*/
+static double Extended_To_Double(const unsigned char *bytes)
+{
+	unsigned __int64 mantissa = 0;
+	for (int i = 7; i >= 0; i--) {
+		mantissa = (mantissa << 8) | bytes[i];
+	}
+	int exponent = ((bytes[9] & 0x7f) << 8) | bytes[8];
+	double sign = (bytes[9] & 0x80) ? -1.0 : 1.0;
+	if (exponent == 0 && mantissa == 0) {
+		return sign * 0.0;
+	}
+	if (exponent == 0x7fff) {
+		return (mantissa << 1) ? (double)NAN : sign * (double)INFINITY;
+	}
+	return sign * ldexp((double)mantissa, (exponent ? exponent : 1) - 16383 - 63);
+}
 
 #ifdef WWDEBUG
 #define DebugString 	WWDebug_Printf
@@ -177,7 +199,7 @@ int __cdecl _purecall(void)
 	** Use int3 to cause an exception.
 	*/
 	WWDEBUG_SAY(("Pure Virtual Function call. Oh No!\n"));
-	_asm int 0x03;
+	DebugBreak();
 #endif	//_DEBUG_ASSERT
 
 	return(return_code);
@@ -434,7 +456,8 @@ void Dump_Exception_Info(EXCEPTION_POINTERS *e_info)
 	/*
 	** Match the exception type with the error string and print it out
 	*/
-	for (int i=0 ; _codes[i] != 0xffffffff ; i++) {
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0 ; _codes[i] != 0xffffffff ; i++) {
 		if (_codes[i] == e_info->ExceptionRecord->ExceptionCode) {
 			DebugString("Exception Handler: Found exception description\n");
 			break;
@@ -628,13 +651,7 @@ void Dump_Exception_Info(EXCEPTION_POINTERS *e_info)
 		/*
 		** Convert FP dump from temporary real value (10 bytes) to double (8 bytes).
 		*/
-		_asm {
-			push	eax
-			mov	eax,fp_data_ptr
-			fld   tbyte ptr [eax]
-			fstp	qword ptr [fp_value]
-			pop	eax
-		}
+		fp_value = Extended_To_Double((const unsigned char *)fp_data_ptr);	// was x87 inline assembly
 		sprintf(scrap, "   %+#.17e\r\n", fp_value);
 		Add_Txt(scrap);
 	}
@@ -1230,12 +1247,17 @@ int Stack_Walk(unsigned long *return_addresses, int num_addresses, CONTEXT *cont
 
 	unsigned long reg_eip, reg_ebp, reg_esp;
 
-	__asm {
-here:
-		lea	eax,here
-		mov	reg_eip,eax
-		mov	reg_ebp,ebp
-		mov	reg_esp,esp
+	/*
+	** Start the walk here (was inline assembly).
+	*/
+	{
+		CONTEXT here;
+		memset(&here, 0, sizeof(here));
+		here.ContextFlags = CONTEXT_FULL;
+		RtlCaptureContext(&here);
+		reg_eip = here.Eip;
+		reg_ebp = here.Ebp;
+		reg_esp = here.Esp;
 	}
 
 	stack_frame.AddrPC.Mode = AddrModeFlat;

@@ -42,7 +42,7 @@
 #include "Common/INIException.h"
 #include "Common/MessageStream.h"
 #include "Common/ThingFactory.h"
-#include "Common/File.h"
+#include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/ArchiveFileSystem.h"
 #include "Common/LocalFileSystem.h"
@@ -106,7 +106,7 @@
 #include "GameNetwork/LANAPI.h"
 #include "GameNetwork/GameSpy/GameResultsThread.h"
 
-#include "Common/Version.h"
+#include "Common/version.h"
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -169,7 +169,9 @@ void initSubsystem(SUBSYSTEM*& sysref, AsciiString name, SUBSYSTEM* sys, Xfer *p
 
 //-------------------------------------------------------------------------------------------------
 extern HINSTANCE ApplicationHInstance;  ///< our application instance
+#if ZH_HAS_ATL
 extern CComModule _Module;
+#endif
 
 //-------------------------------------------------------------------------------------------------
 static void updateTGAtoDDS();
@@ -190,7 +192,9 @@ GameEngine::GameEngine( void )
 	m_quitting = FALSE;
 	m_isActive = FALSE;
 
+#if ZH_HAS_ATL
 	_Module.Init(NULL, ApplicationHInstance);
+#endif
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -228,7 +232,9 @@ GameEngine::~GameEngine()
 
 	Drawable::killStaticImages();
 
+#if ZH_HAS_ATL
 	_Module.Term();
+#endif
 
 #ifdef PERF_TIMERS
 	PerfGather::termPerfDump();
@@ -649,7 +655,8 @@ void GameEngine::init( int argc, char *argv[] )
 			}
 			else if (fname.endsWithNoCase(".rep"))
 			{
-				TheRecorder->playbackFile(fname);
+				if (!TheRecorder->playbackFile(fname))
+					ReplayCheckFinish(REPLAYCHECK_LOAD_FAILED);	// no-op unless -replayCheck
 			}
 		}
 

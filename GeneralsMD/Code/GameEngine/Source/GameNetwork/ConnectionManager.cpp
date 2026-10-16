@@ -30,7 +30,7 @@
 #include "Common/AudioEventRTS.h"
 #include "Common/CRCDebug.h"
 #include "Common/Debug.h"
-#include "Common/File.h"
+#include "Common/file.h"
 #include "Common/GameAudio.h"
 #include "Common/LocalFileSystem.h"
 #include "Common/Player.h"
@@ -45,7 +45,7 @@
 #include "GameNetwork/LANAPICallbacks.h"
 #include "GameNetwork/NAT.h"
 #include "GameNetwork/NetCommandWrapperList.h"
-#include "GameNetwork/NetworkUtil.h"
+#include "GameNetwork/networkutil.h"
 #include "GameNetwork/NetworkTiming.h"
 #include "GameLogic/GameLogic.h"
 #include "GameLogic/ScriptActions.h"
@@ -76,7 +76,8 @@ ConnectionManager::~ConnectionManager(void)
 		m_transport = NULL;
 	}
 
-	for (Int i = 0; i < MAX_SLOTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		if (m_frameData[i] != NULL) {
 			m_frameData[i]->deleteInstance();
 			m_frameData[i] = NULL;
@@ -128,7 +129,8 @@ ConnectionManager::~ConnectionManager(void)
  */
 ConnectionManager::ConnectionManager(void)
 {
-	for (Int i = 0; i < MAX_SLOTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		m_frameData[i] = NULL;
 	}
 	m_transport = NULL;
@@ -152,7 +154,8 @@ void ConnectionManager::init()
 //	}
 //	m_transport->reset();
 
-	for (UnsignedInt i = 0; i < NUM_CONNECTIONS; ++i) {
+	UnsignedInt i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < NUM_CONNECTIONS; ++i) {
 		m_connections[i] = NULL;
 	}
 
@@ -230,7 +233,8 @@ void ConnectionManager::reset()
 		m_transport = NULL;
 	}
 
-	for (Int i = 0; i < NUM_CONNECTIONS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < NUM_CONNECTIONS; ++i) {
 		if (m_connections[i] != NULL) {
 			m_connections[i]->deleteInstance();
 			m_connections[i] = NULL;
@@ -1551,7 +1555,8 @@ Bool ConnectionManager::allCommandsReady(UnsignedInt frame, Bool justTesting /* 
 	Bool retval = TRUE;
 	FrameDataReturnType frameRetVal;
 //	retval = FALSE;  // ****for testing purposes only!!!!!!****
-	for (Int i = 0; (i < MAX_SLOTS) && retval; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; (i < MAX_SLOTS) && retval; ++i) {
 		if ((m_frameData[i] != NULL) && (m_frameData[i]->getIsQuitting() == FALSE)) {
 /*
 			if (!(m_frameData[i]->allCommandsReady(frame, (frame != commandsReadyDebugSpewage) && (justTesting == FALSE)))) {

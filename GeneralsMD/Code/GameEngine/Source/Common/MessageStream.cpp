@@ -113,7 +113,8 @@ GameMessageArgumentDataType GameMessage::getArgumentDataType( Int argIndex )
 		return ARGUMENTDATATYPE_UNKNOWN;
 	}
 	int i=0;
-	for (GameMessageArgument *a = m_argList; a && (i < argIndex); a=a->m_next, ++i );
+	GameMessageArgument * a;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (a = m_argList; a && (i < argIndex); a=a->m_next, ++i );
 
 	if (a != NULL)
 	{

@@ -33,7 +33,7 @@
 
 #include "Common/STLTypedefs.h"
 
-#include "Common/File.h"
+#include "Common/file.h"
 #include "Common/FileSystem.h"
 #include "Common/GameEngine.h"
 #include "Common/GameSpyMiscPreferences.h"
@@ -589,7 +589,7 @@ void WOLLoginMenuInit( WindowLayout *layout, void *userData )
 #endif // ALLOW_NON_PROFILED_LOGIN
 		// Read login names from registry...
 		GadgetComboBoxReset(comboBoxEmail);
-		GadgetTextEntrySetText(textEntryPassword, UnicodeString.TheEmptyString);
+		GadgetTextEntrySetText(textEntryPassword, UnicodeString::TheEmptyString);
 
 		// look for cached nicks to add
 		AsciiString lastName;
@@ -911,7 +911,7 @@ WindowMsgHandledType WOLLoginMenuInput( GameWindow *window, UnsignedInt msg,
 					// send a simulated selected event to the parent window of the
 					// back/exit button
 					//
-					if( BitTest( state, KEY_STATE_UP ) )
+					if( BitIsSet( state, KEY_STATE_UP ) )
 					{
 						TheWindowManager->winSendSystemMsg( window, GBM_SELECTED, 
 																							(WindowMsgData)buttonBack, buttonBackID );

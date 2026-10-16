@@ -37,7 +37,7 @@
 #include "Common/MultiplayerSettings.h"
 #include "Common/PlayerTemplate.h"
 #include "Common/CustomMatchPreferences.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 #include "GameClient/AnimateWindowManager.h"
 #include "GameClient/WindowLayout.h"
 #include "GameClient/Gadget.h"
@@ -509,7 +509,8 @@ void PopulateLobbyPlayerListbox(void)
 		std::set<Int> indicesToSelect;
 		UnicodeString uStr;
 		Int numSelected = 0;
-		for (Int i=0; i<maxSelectedItems; ++i)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<maxSelectedItems; ++i)
 		{
 			if (selectedIndices[i] < 0)
 			{
@@ -656,7 +657,7 @@ void WOLLobbyMenuInit( WindowLayout *layout, void *userData )
 	comboLobbyGroupRoomsID = TheNameKeyGenerator->nameToKey(AsciiString("WOLCustomLobby.wnd:ComboBoxGroupRooms"));
 	comboLobbyGroupRooms = TheWindowManager->winGetWindowFromId(parent, comboLobbyGroupRoomsID);
 
-	GadgetTextEntrySetText(textEntryChat, UnicodeString.TheEmptyString);
+	GadgetTextEntrySetText(textEntryChat, UnicodeString::TheEmptyString);
 
 	populateGroupRoomListbox(comboLobbyGroupRooms);
 
@@ -864,7 +865,7 @@ static const char* getMessageString(Int t)
 /** refreshGameList 
 		The Bool is used to force refresh if the refresh button was hit.*/
 //-------------------------------------------------------------------------------------------------
-static void refreshGameList( Bool forceRefresh )
+void refreshGameList( Bool forceRefresh )
 {
 	Int refreshInterval = gameListRefreshInterval;
 
@@ -887,7 +888,7 @@ static void refreshGameList( Bool forceRefresh )
 /** refreshPlayerList 
 		The Bool is used to force refresh if the refresh button was hit.*/
 //-------------------------------------------------------------------------------------------------
-static void refreshPlayerList( Bool forceRefresh )
+void refreshPlayerList( Bool forceRefresh )
 {
 		Int refreshInterval = playerListRefreshInterval;
 
@@ -1355,7 +1356,7 @@ WindowMsgHandledType WOLLobbyMenuInput( GameWindow *window, UnsignedInt msg,
 					// send a simulated selected event to the parent window of the
 					// back/exit button
 					//
-					if( BitTest( state, KEY_STATE_UP ) )
+					if( BitIsSet( state, KEY_STATE_UP ) )
 					{
 						TheWindowManager->winSendSystemMsg( window, GBM_SELECTED, 
 																							(WindowMsgData)buttonBack, buttonBackID );

@@ -68,7 +68,7 @@ char* strtrim(char* buffer)
 		}
 
 		if (source != buffer) {
-			strcpy(buffer, source);
+			memmove(buffer, source, strlen(source) + 1);	/* was strcpy, which is undefined for overlapping strings */
 		}
 
 		/* Clip trailing white space from the string. */

@@ -35,9 +35,10 @@
  *   Get_CPU_Rate -- Fetch the rate of CPU ticks per second.                                   *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "zh_intrin.h"
 #include	"always.h"
 #include	"win.h"
-#include	"mpu.h"
+#include	"MPU.H"
 #include "math.h"
 #include <assert.h>
 
@@ -86,16 +87,9 @@ unsigned long Get_CPU_Rate(unsigned long & high)
 
 unsigned long Get_CPU_Clock(unsigned long & high)
 {
-	int h;
-	int l;
-	__asm {
-		_emit 0Fh
-		_emit 31h
-		mov	[h],edx
-		mov	[l],eax
-	}
-	high = h;
-	return(l);
+	unsigned long long t = ZH_Rdtsc();
+	high = (unsigned long)(t >> 32);
+	return((unsigned long)t);
 }
 
 
@@ -112,7 +106,6 @@ unsigned long Get_CPU_Clock(unsigned long & high)
 **
 */
 
-#define ASM_RDTSC _asm _emit 0x0f _asm _emit 0x31
 
 // Max # of samplings to allow before giving up and returning current average.
 #define MAX_TRIES			20
@@ -126,12 +119,9 @@ static unsigned long TSC_High;
 
 void RDTSC(void)
 {
-    _asm
-    {
-        ASM_RDTSC;
-        mov     TSC_Low, eax
-        mov     TSC_High, edx
-    }
+    unsigned long long t = ZH_Rdtsc();
+    TSC_Low = (unsigned long)t;
+    TSC_High = (unsigned long)(t >> 32);
 }
 
 
@@ -197,8 +187,7 @@ int Get_RDTSC_CPU_Speed(void)
 			QueryPerformanceCounter(&t1);
 		}
 
-		ASM_RDTSC;
-		_asm	mov	stamp0, EAX
+		stamp0 = (DWORD)ZH_Rdtsc();
 
 		t0.LowPart = t1.LowPart;		// Reset Initial Time
 		t0.HighPart = t1.HighPart;
@@ -211,8 +200,7 @@ int Get_RDTSC_CPU_Speed(void)
 			QueryPerformanceCounter(&t1);
 		}
 
-		ASM_RDTSC;
-		_asm	mov	stamp1, EAX
+		stamp1 = (DWORD)ZH_Rdtsc();
 
 
 		cycles = stamp1 - stamp0;					// # of cycles passed between reads
@@ -235,7 +223,7 @@ int Get_RDTSC_CPU_Speed(void)
 
 		total = ( freq + freq2 + freq3 );		// Total last three frequency calcs
 
-	} while ( (tries < 3 ) || (tries < 20) && ((abs(3 * freq -total) > 3*TOLERANCE )|| (abs(3 * freq2-total) > 3*TOLERANCE )|| (abs(3 * freq3-total) > 3*TOLERANCE )));
+	} while ( (tries < 3 ) || (tries < 20) && ((labs((long)(3 * freq -total)) > 3*TOLERANCE )|| (labs((long)(3 * freq2-total)) > 3*TOLERANCE )|| (labs((long)(3 * freq3-total)) > 3*TOLERANCE )));
 
 	SetThreadPriority(thread, threadPri);
 	SetPriorityClass(process, processPri);

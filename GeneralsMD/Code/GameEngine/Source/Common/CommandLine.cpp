@@ -27,9 +27,10 @@
 
 #include "Common/ArchiveFileSystem.h"
 #include "Common/CommandLine.h"
+#include "Common/Recorder.h"
 #include "Common/CRCDebug.h"
 #include "Common/LocalFileSystem.h"
-#include "Common/Version.h"
+#include "Common/version.h"
 #include "GameClient/TerrainVisual.h" // for TERRAIN_LOD_MIN definition
 #include "GameClient/GameText.h"
 
@@ -758,6 +759,35 @@ Int parseSync(char *args[], int)
 	return 1;
 }
 
+//=============================================================================
+// -replayCheck <file.rep>: verify a replay and quit (see ReplayCheckResult in Recorder.h).
+// The file is looked up in the replay directory unless it is an absolute path.
+//=============================================================================
+Int parseReplayCheck(char *args[], int num)
+{
+	if (TheWritableGlobalData && num > 1)
+	{
+		TheReplayCheckMode = TRUE;
+		TheWritableGlobalData->m_initialFile = args[1];
+		// Run the simulation only: no drawing after the first frame, no frame rate limit, no sound,
+		// no intro or shell map.
+		TheWritableGlobalData->m_noDraw = 0xffffffff;
+		TheWritableGlobalData->m_useFpsLimit = FALSE;
+		TheWritableGlobalData->m_TiVOFastMode = TRUE;
+		TheWritableGlobalData->m_audioOn = FALSE;
+		TheWritableGlobalData->m_speechOn = FALSE;
+		TheWritableGlobalData->m_soundsOn = FALSE;
+		TheWritableGlobalData->m_musicOn = FALSE;
+		TheWritableGlobalData->m_videoOn = FALSE;
+		TheWritableGlobalData->m_playIntro = FALSE;
+		TheWritableGlobalData->m_afterIntro = TRUE;
+		TheWritableGlobalData->m_playSizzle = FALSE;
+		TheWritableGlobalData->m_shellMapOn = FALSE;
+		TheWritableGlobalData->m_windowed = TRUE;
+	}
+	return 2;
+}
+
 Int parseNoShellMap(char *args[], int)
 {
 	if (TheWritableGlobalData)
@@ -1145,6 +1175,7 @@ static CommandLineParam params[] =
 	{ "-mod", parseMod },
 	{ "-noshaders", parseNoShaders },
 	{ "-quickstart", parseQuickStart },
+	{ "-replayCheck", parseReplayCheck },
 
 #if (defined(_DEBUG) || defined(_INTERNAL))
 	{ "-noaudio", parseNoAudio },

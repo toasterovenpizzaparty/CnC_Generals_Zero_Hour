@@ -114,7 +114,7 @@ AsciiString AsciiStringToQuotedPrintable(AsciiString original)
 // Convert ascii quoted-printable strings into unicode strings
 UnicodeString QuotedPrintableToUnicodeString(AsciiString original)
 {
-	static unsigned short dest[1024];
+	static WideChar dest[1024];	// (unsigned short under VC6, where wchar_t was unsigned short)
 	int i=0;
 
 	unsigned char *c = (unsigned char *)dest;

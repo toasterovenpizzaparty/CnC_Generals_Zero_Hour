@@ -32,7 +32,7 @@
 
 #include "Lib/BaseType.h"
 #include "Common/RandomValue.h"
-#include "Common/CRC.h"
+#include "Common/crc.h"
 #include "Common/Debug.h"
 #include "GameLogic/GameLogic.h"
 

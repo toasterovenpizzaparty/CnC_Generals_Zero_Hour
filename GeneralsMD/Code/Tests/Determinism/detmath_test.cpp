@@ -60,7 +60,13 @@ static int failures = 0;
 static void check(Stat &s, double limitUlps)
 {
 	report(s);
+#if defined(__GLIBC__)
+	// The accuracy limit is only enforced against glibc, whose libm is accurate to <1 ulp.  Other C
+	// runtimes are not a usable reference: msvcrt's sin/cos/pow lose 10+ ulp for large arguments
+	// (which is exactly why the game must not use them).  The determinism hash below is what
+	// matters on every platform.
 	if (s.maxUlps > limitUlps) { printf("  FAIL: %s exceeds %g ulp\n", s.name, limitUlps); ++failures; }
+#endif
 }
 
 int main()

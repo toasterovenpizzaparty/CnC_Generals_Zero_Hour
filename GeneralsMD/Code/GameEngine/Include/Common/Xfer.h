@@ -35,20 +35,10 @@
 #define __XFER_H_
 
 // INCLUDES ///////////////////////////////////////////////////////////////////////////////////////
-#include "Common/STLTypedefs.h"
-#include "Common/ModelState.h"
-#include "Common/Science.h"
-#include "Common/Upgrade.h"
+#include "Lib/BaseType.h"
 
-// FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
-class Snapshot;
-typedef Int Color;
-enum ObjectID;
-enum DrawableID;
-enum KindOfType;
-enum ScienceType;
-class Matrix3D;
-
+// These come before the includes below: ModelState.h -> BitFlagsIO.h uses them while this
+// header is still being read.
 // ------------------------------------------------------------------------------------------------
 typedef UnsignedByte XferVersion;
 
@@ -92,6 +82,22 @@ enum XferStatus
 
 	NUM_XFER_STATUS  // please keep this last
 };
+
+#include "Common/STLTypedefs.h"
+#include "Common/ModelState.h"
+#include "Common/Science.h"
+#include "Common/Upgrade.h"
+
+// FORWARD REFERENCES /////////////////////////////////////////////////////////////////////////////
+class Snapshot;
+typedef Int Color;
+enum ObjectID : int;
+enum DrawableID : int;
+enum KindOfType : int;
+enum ScienceType : int;
+class Matrix3D;
+
+
 
 // ------------------------------------------------------------------------------------------------
 // ------------------------------------------------------------------------------------------------

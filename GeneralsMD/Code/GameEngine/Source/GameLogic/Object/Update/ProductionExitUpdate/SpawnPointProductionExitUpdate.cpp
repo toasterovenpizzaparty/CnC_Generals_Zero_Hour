@@ -39,14 +39,15 @@
 #include "GameLogic/TerrainLogic.h"
 #include "GameLogic/Module/SpawnPointProductionExitUpdate.h"
 
-#include "WWMath/Matrix3D.h"		///< @todo Replace with our own matrix library
+#include "WWMath/matrix3d.h"		///< @todo Replace with our own matrix library
 
 //-------------------------------------------------------------------------------------------------
 SpawnPointProductionExitUpdate::SpawnPointProductionExitUpdate( Thing *thing, const ModuleData* moduleData ) : UpdateModule( thing, moduleData )
 {
 	m_bonesInitialized = FALSE;
 	m_spawnPointCount = 0;
-	for( Int positionIndex = 0; positionIndex < MAX_SPAWN_POINTS; positionIndex++ )
+	Int positionIndex;	// hoisted: was visible after the loop under VC6 scoping rules
+	for( positionIndex = 0; positionIndex < MAX_SPAWN_POINTS; positionIndex++ )
 	{
 		m_worldCoordSpawnPoints[positionIndex].zero();
 		m_worldAngleSpawnPoints[positionIndex] = 0.0f;
@@ -71,7 +72,8 @@ void SpawnPointProductionExitUpdate::exitObjectViaDoor( Object *newObj, ExitDoor
 	Object *creationObject = getObject();
 	if (creationObject)
 	{
-		for( Int positionIndex = 0; positionIndex < m_spawnPointCount; positionIndex++ )
+		Int positionIndex;	// hoisted: was visible after the loop under VC6 scoping rules
+		for( positionIndex = 0; positionIndex < m_spawnPointCount; positionIndex++ )
 		{
 			if( m_spawnPointOccupier[positionIndex] == INVALID_ID )
 				break;
@@ -149,7 +151,8 @@ void SpawnPointProductionExitUpdate::initializeBonePositions()
 		return;
 
 	Matrix3D boneTransforms[MAX_SPAWN_POINTS];
-	for( Int matrixIndex = 0; matrixIndex < MAX_SPAWN_POINTS; matrixIndex++ )
+	Int matrixIndex;	// hoisted: was visible after the loop under VC6 scoping rules
+	for( matrixIndex = 0; matrixIndex < MAX_SPAWN_POINTS; matrixIndex++ )
 		boneTransforms[matrixIndex].Make_Identity();
 
 	// Get all the bones of the right name

@@ -58,10 +58,10 @@
 #include "WW3D2/dx8renderer.h"
 #include "WW3D2/sortingrenderer.h"
 #include "WW3D2/dx8wrapper.h"
-#include "WW3D2/Light.h"
+#include "WW3D2/light.h"
 #include "WW3D2/matpass.h"
 #include "WW3D2/shader.h"
-#include "WW3D2/DX8Caps.h"
+#include "WW3D2/dx8caps.h"
 #include "WW3D2/colorspace.h"
 
 #include "WW3D2/shdlib.h"
@@ -97,7 +97,8 @@ RTS3DScene::RTS3DScene()
 	setName("RTS3DScene");
 	m_drawTerrainOnly = false;
 	m_numGlobalLights=0;
-	for (Int i=0; i<LightEnvironmentClass::MAX_LIGHTS; i++)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<LightEnvironmentClass::MAX_LIGHTS; i++)
 	{	m_globalLight[i]=NULL;
 		m_infantryLight[i]=NEW_REF( LightClass, (LightClass::DIRECTIONAL) );
 	}
@@ -200,7 +201,8 @@ RTS3DScene::RTS3DScene()
 //=============================================================================
 RTS3DScene::~RTS3DScene()
 {
-	for (Int i=0; i<LightEnvironmentClass::MAX_LIGHTS; i++)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<LightEnvironmentClass::MAX_LIGHTS; i++)
 	{
 		REF_PTR_RELEASE(m_globalLight[i]);
 		REF_PTR_RELEASE(m_infantryLight[i]);
@@ -1209,7 +1211,8 @@ Int playerIndexToColorIndex(Int playerIndex)
 	Int flippedPosition;
 
 	//Player index is stored in 4 bits
-	for (Int i=0; i<NUMBER_PLAYER_COLOR_BITS; i++)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<NUMBER_PLAYER_COLOR_BITS; i++)
 	{
 		flippedPosition = NUMBER_PLAYER_COLOR_BITS-1-i;	//correct position of bit after it's flipped left/right
 
@@ -1340,7 +1343,8 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 	//Clear pointers into temporary arrays where each player's objects will be stored.
 	//We do this so that all objects are sorted by color which reduces the number of
 	//state changes needed when drawing them.
-	for (Int i=0; i<MAX_PLAYER_COUNT; i++)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<MAX_PLAYER_COUNT; i++)
 	{	lastPlayerObject[i]=&playerObjects[i][0];
 		playerColorIndex[i]=-1;
 	}
@@ -1353,7 +1357,8 @@ void RTS3DScene::flushOccludedObjectsIntoStencil(RenderInfoClass & rinfo)
 	if (m_numPotentialOccludees && m_numPotentialOccluders)
 	{
 		//bucket sort all possibly occluded objects by player index/color.
-		for (Int i=0; i<m_numPotentialOccludees; i++)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<m_numPotentialOccludees; i++)
 		{
 			robj=m_potentialOccludees[i];
 
@@ -1559,7 +1564,8 @@ void RTS3DScene::flushOccludedObjects(RenderInfoClass & rinfo)
 		//First draw all the solid colored models
 		///@todo: Optimize this so that the extra passes don't actually install the material since it's all the same.
 		rinfo.Push_Override_Flags(RenderInfoClass::RINFO_OVERRIDE_ADDITIONAL_PASSES_ONLY);	//disable textures
-		for (Int i=0; i<m_occludedObjectsCount; i++)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<m_occludedObjectsCount; i++)
 		{
 			robj=m_potentialOccludees[i];
 

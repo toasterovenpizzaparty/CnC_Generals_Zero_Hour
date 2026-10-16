@@ -97,13 +97,22 @@
 //#define abs(x) (((x) < 0) ? -(x) : (x))
 //#endif
 
-#ifndef min
-#define min(x,y) (((x)<(y)) ? (x) : (y))
-#endif
+#include <xmmintrin.h>	// _mm_cvtss_si32, see fast_float2long_round
 
-#ifndef max
-#define max(x,y) (((x)>(y)) ? (x) : (y))
+// min/max used to be macros, which break the standard library headers.  These templates give
+// the same result type as the macros' ?: expression (std::common_type) without evaluating the
+// arguments twice.  NOMINMAX keeps <windows.h> from defining its own macros.
+#include <type_traits>
+#ifdef min
+#undef min
 #endif
+#ifdef max
+#undef max
+#endif
+template <typename A, typename B>
+inline typename std::common_type<A, B>::type min(A x, B y) { return (x < y) ? x : y; }
+template <typename A, typename B>
+inline typename std::common_type<A, B>::type max(A x, B y) { return (x > y) ? x : y; }
 
 #ifndef TRUE
 #define TRUE true
@@ -134,7 +143,7 @@ typedef bool							Bool;							//
 typedef __int64						Int64;							// 8 bytes 
 typedef unsigned __int64	UnsignedInt64;	  	// 8 bytes 
 
-#include "Lib/Trig.h"
+#include "Lib/trig.h"
 
 //-----------------------------------------------------------------------------
 typedef wchar_t WideChar;  ///< multi-byte character representations
@@ -169,44 +178,37 @@ inline Real deg2rad(Real rad) { return rad * (PI/180); }
 //-----------------------------------------------------------------------------
 // For twiddling bits
 //-----------------------------------------------------------------------------
-#define BitTest( x, i ) ( ( (x) & (i) ) != 0 )
+// (was BitTest, which clashes with the Windows SDK's BitTest -> _bittest macro)
+#define BitIsSet( x, i ) ( ( (x) & (i) ) != 0 )
 #define BitSet( x, i ) ( (x) |= (i) )
 #define BitClear( x, i ) ( (x ) &= ~(i) )
 #define BitToggle( x, i ) ( (x) ^= (i) )
 
 //-------------------------------------------------------------------------------------------------
 
-// note, this function depends on the cpu rounding mode, which we set to CHOP every frame, 
-// but apparently tends to be left in unpredictable modes by various system bits of
-// code, so use this function with caution -- it might not round in the way you want.
+// Float -> integer helpers used by the simulation (REAL_TO_INT etc.).  These were x87 inline
+// assembly; the portable versions below reproduce the original results bit for bit, because
+// the simulation must give identical answers on every machine:
+//   * fast_float2long_round: round using the current rounding mode (setFPMode selects round to
+//     nearest even), out-of-range values give 0x80000000 - exactly like FISTP.  CVTSS2SI behaves
+//     identically and uses the SSE rounding mode, which setFPMode also sets.
+//   * fast_float_trunc: clears the fraction bits of the float (the original bit trick, including
+//     its quirks: values below 1 become +0, and the shift count is taken modulo 32).
 __forceinline long fast_float2long_round(float f)
 {
-	long i;
-
-	__asm {
-		fld [f]
-		fistp [i]
-	}
-
-	return i;
+	return (long)_mm_cvtss_si32(_mm_set_ss(f));
 }
 
-// super fast float trunc routine, works always (independent of any FPU modes)
-// code courtesy of Martin Hoffesommer (grin)
 __forceinline float fast_float_trunc(float f)
 {
-  _asm
-  {
-    mov ecx,[f]
-    shr ecx,23
-    mov eax,0xff800000
-    xor ebx,ebx
-    sub cl,127
-    cmovc eax,ebx
-    sar eax,cl
-    and [f],eax
-  }
-  return f;
+	union { float f; unsigned int u; } v;
+	v.f = f;
+	int e = (int)((v.u >> 23) & 0xFF) - 127;
+	unsigned int mask = 0;
+	if (e >= 0)
+		mask = (unsigned int)(((int)0xff800000) >> (e & 31));
+	v.u &= mask;
+	return v.f;
 }
 
 // same here, fast floor function

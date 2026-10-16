@@ -77,11 +77,9 @@
 
 	#define _OPERATOR_NEW_DEFINED_
 
-	extern void * __cdecl operator new		(size_t size);
-	extern void __cdecl operator delete		(void *p);
-
-	extern void * __cdecl operator new[]	(size_t size);
-	extern void __cdecl operator delete[]	(void *p);
+	// The plain operator new/delete are declared by <new>; redeclaring them here conflicts with
+	// the exception specifications of standard C++ compilers.
+	#include <new>
 
 	// additional overloads to account for VC/MFC funky versions
 	extern void* __cdecl operator new			(size_t nSize, const char *, int);
@@ -90,11 +88,7 @@
 	extern void* __cdecl operator new[]		(size_t nSize, const char *, int);
 	extern void __cdecl operator delete[]	(void *, const char *, int);
 
-	// additional overloads for 'placement new'
-	//inline void* __cdecl operator new							(size_t s, void *p) { return p; }
-	//inline void __cdecl operator delete						(void *, void *p)		{ }
-	inline void* __cdecl operator new[]						(size_t s, void *p) { return p; }
-	inline void __cdecl operator delete[]					(void *, void *p)		{ }
+	// placement new/delete come from <new>
 
 #endif
 
@@ -235,7 +229,7 @@ template <class T> T max(T a,T b)
 #endif
 
 #if defined(__WATCOMC__)
-#include	"watcom.h"
+#include	"WATCOM.H"
 #endif
 
 

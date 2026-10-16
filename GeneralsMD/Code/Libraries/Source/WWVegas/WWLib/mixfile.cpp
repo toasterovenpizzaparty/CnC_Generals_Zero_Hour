@@ -37,9 +37,9 @@
 #include "mixfile.h"
 #include "wwdebug.h"
 #include "ffactory.h"
-#include "wwfile.h"
+#include "WWFILE.H"
 #include "realcrc.h"
-#include "rawfile.h"
+#include "RAWFILE.H"
 #include "win.h"
 #include "bittype.h"
 
@@ -334,7 +334,8 @@ MixFileFactoryClass::Flush_Changes (void)
 		//
 		//	Add all the remaining files from our file set
 		//
-		for (int index = 0; index < FilenameList.Count (); index ++) {
+		int index;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (index = 0; index < FilenameList.Count (); index ++) {
 			StringClass &filename = FilenameList[index];
 
 			//
@@ -438,7 +439,8 @@ bool	MixFileFactoryClass::Build_Ordered_Filename_List (DynamicVectorClass<String
 	// associate offset with each name and add to list
 	DynamicVectorClass<FileOffsetStruct>	local_file_info;
 	local_file_info.Resize( name_list.Count());
-	for (int i = 0; i < name_list.Count(); ++i) {
+	int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < name_list.Count(); ++i) {
 		// Here, we have to assume that the names in the list are in CRC order, just like FileInfo is.
 		FileOffsetStruct temp;
 		temp.Filename	= name_list[i];
@@ -675,7 +677,7 @@ void	Add_Files( const char * dir, MixFileCreator & mix )
 			StringClass name;
 			name.Format( "%s%s", dir, find_info.cFileName );
 			StringClass	source;
-			source.Format( "makemix\\%s", name );
+			source.Format( "makemix\\%s", name.Peek_Buffer() );
 			mix.Add_File( source, name );
 //			WWDEBUG_SAY(( "Adding file from %s %s\n", source, name ));
 		}

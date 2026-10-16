@@ -194,7 +194,8 @@ NATStateType NAT::update() {
 		// check for all stats
 		Bool gotAllStats = TRUE;
 		Bool timedOut = FALSE;
-		for (Int i=0; i<MAX_SLOTS; ++i)
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0; i<MAX_SLOTS; ++i)
 		{
 			const GameSpyGameSlot *slot = TheGameSpyGame->getGameSpySlot(i);
 			if (slot && slot->isHuman())
@@ -338,7 +339,8 @@ NATConnectionState NAT::connectionUpdate() {
 	m_transport->update();
 
 	// check to see if we've been probed.
-	for (Int i = 0; i < MAX_MESSAGES; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_MESSAGES; ++i) {
 		if (m_transport->m_inBuffer[i].length > 0) {
 #ifdef DEBUG_LOGGING
 			UnsignedInt ip = m_transport->m_inBuffer[i].addr;
@@ -480,7 +482,8 @@ void NAT::establishConnectionPaths() {
 
 	// determine how many nodes we have.
 	m_numNodes = 0;
-	for (Int i = 0; i < MAX_SLOTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		if (m_slotList[i] != NULL) {
 			if (m_slotList[i]->isHuman()) {
 				DEBUG_LOG(("NAT::establishConnectionPaths - slot %d is %ls\n", i, m_slotList[i]->getName().str()));
@@ -659,7 +662,8 @@ void NAT::doThisConnectionRound() {
 	// clear out the states from the last round.
 	m_targetNodeNumber = -1;
 
-	for (Int i = 0; i < MAX_SLOTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		setConnectionState(i, NATCONNECTIONSTATE_NOSTATE);
 	}
 
@@ -1305,7 +1309,8 @@ void NAT::setConnectionState(Int nodeNumber, NATConnectionState state) {
 	// find the menu slot of the target node.
 	Int slotIndex = m_connectionNodes[m_targetNodeNumber].m_slotIndex;
 	Int slot = 0;
-	for (Int i = 0; i < MAX_SLOTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SLOTS; ++i) {
 		if (m_slotList[i] != NULL) {
 			if (m_slotList[i]->isHuman()) {
 				if (i != m_connectionNodes[m_localNodeNumber].m_slotIndex) {

@@ -40,26 +40,28 @@
 // USER INCLUDES //////////////////////////////////////////////////////////////
 #include "always.h"
 #include "GameClient/View.h"
-#include "WW3D2/Camera.h"
-#include "WW3D2/Light.h"
-#include "WW3D2/DX8Wrapper.h"
-#include "WW3D2/HLod.h"
+#include "WW3D2/camera.h"
+#include "WW3D2/light.h"
+#include "WW3D2/dx8wrapper.h"
+#include "WW3D2/hlod.h"
 #include "WW3D2/mesh.h"
 #include "WW3D2/meshmdl.h"
 #include "Lib/BaseType.h"
 #include "W3DDevice/GameClient/W3DGranny.h"
-#include "W3DDevice/GameClient/Heightmap.h"
-#include "D3dx8math.h"
-#include "common/GlobalData.h"
-#include "common/drawmodule.h"
+#include "W3DDevice/GameClient/HeightMap.h"
+#include "d3dx8math.h"
+#include "Common/GlobalData.h"
+#include "Common/DrawModule.h"
 #include "W3DDevice/GameClient/W3DVolumetricShadow.h"
 #include "W3DDevice/GameClient/W3DShadow.h"
 #include "WW3D2/statistics.h"
 #include "GameLogic/TerrainLogic.h"
-#include "WW3D2/DX8Caps.h"
+#include "WW3D2/dx8caps.h"
 #include "GameClient/Drawable.h"
+#ifdef USE_WWSHADE	// wwshade is not part of the build (see CMakeLists.txt)
 #include "wwshade/shdmesh.h"
 #include "wwshade/shdsubmesh.h"
+#endif
 
 #ifdef _INTERNAL
 // for occasional debugging...
@@ -275,11 +277,11 @@ class W3DShadowGeometryMesh
 	friend class W3DVolumetricShadow;
 	
 public:
-	W3DShadowGeometryMesh::W3DShadowGeometryMesh( void );
+	W3DShadowGeometryMesh( void );
 #ifdef DO_TERRAIN_SHADOW_VOLUMES
 	virtual
 #endif
-	W3DShadowGeometryMesh::~W3DShadowGeometryMesh( void );
+	~W3DShadowGeometryMesh( void );
 
 	/// @todo: Cache/Store face normals someplace so they are not recomputed when lights move.
 	const Vector3& GetPolygonNormal(long dwPolyNormId) const
@@ -701,7 +703,7 @@ Int W3DShadowGeometry::initFromHLOD(RenderObjClass *robj)
 		}
 
 		
-#if (1) //(cnc3)(gth) Support for ShaderMeshes!
+#ifdef USE_WWSHADE //(cnc3)(gth) Support for ShaderMeshes!  (was #if (1); shader meshes only exist with wwshade)
 // I'm coding this as a completely independent block rather than re-factoring the code above
 // because it will probably save us pain in future merges.
 		if (hlod->Peek_Lod_Model(top,i) && hlod->Peek_Lod_Model(top,i)->Class_ID() == RenderObjClass::CLASSID_SHDMESH)
@@ -1403,7 +1405,7 @@ void W3DVolumetricShadow::RenderMeshVolume(Int meshIndex, Int lightIndex, const 
 	Matrix4x4 mWorld(*meshXform);
 
 	///@todo: W3D always does transpose on all of matrix sets.  Slow???  Better to hack view matrix.
-	m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&mWorld.Transpose());
+	{ Matrix4x4 transposed = mWorld.Transpose(); m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&transposed); }
 	
 	W3DBufferManager::W3DVertexBufferSlot *vbSlot=m_shadowVolumeVB[lightIndex][ meshIndex ];
 	if (!vbSlot)
@@ -1523,7 +1525,7 @@ void W3DVolumetricShadow::RenderDynamicMeshVolume(Int meshIndex, Int lightIndex,
 	
 	Matrix4x4 mWorld(*meshXform);
 
-	m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&mWorld.Transpose());
+	{ Matrix4x4 transposed = mWorld.Transpose(); m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&transposed); }
 
 	if (shadowVertexBufferD3D != lastActiveVertexBuffer)
 	{	m_pDev->SetStreamSource(0,shadowVertexBufferD3D,sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
@@ -1678,7 +1680,7 @@ void W3DVolumetricShadow::RenderMeshVolumeBounds(Int meshIndex, Int lightIndex, 
 	//todo: replace this with mesh transform
 	Matrix4x4 mWorld(1);	//identity since boxes are pre-transformed to world space.
 
-	m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&mWorld.Transpose());
+	{ Matrix4x4 transposed = mWorld.Transpose(); m_pDev->SetTransform(D3DTS_WORLD,(_D3DMATRIX *)&transposed); }
 	
 	m_pDev->SetStreamSource(0,shadowVertexBufferD3D,sizeof(SHADOW_DYNAMIC_VOLUME_VERTEX));
 	m_pDev->SetVertexShader(SHADOW_DYNAMIC_VOLUME_FVF);
@@ -2524,7 +2526,7 @@ void W3DVolumetricShadow::buildSilhouette(Int meshIndex, Vector3 *lightPosObject
 				// ignore neighbors that are marked as processed as those
 				// onces have already detected edges if present
 				//
-				if( BitTest( otherNeighbor->status, POLY_PROCESSED ) )
+				if( BitIsSet( otherNeighbor->status, POLY_PROCESSED ) )
 					continue;  // for j
 
 			}  // end if
@@ -2537,7 +2539,7 @@ void W3DVolumetricShadow::buildSilhouette(Int meshIndex, Vector3 *lightPosObject
 			// if we have no neighbor we just record the fact that we have
 			// real model end edges to add after this inner j loop;
 			//
-			if( BitTest( polyNeighbor->status, POLY_VISIBLE ) )
+			if( BitIsSet( polyNeighbor->status, POLY_VISIBLE ) )
 			{
 
 				// check for no neighbor edges
@@ -2547,7 +2549,7 @@ void W3DVolumetricShadow::buildSilhouette(Int meshIndex, Vector3 *lightPosObject
 					visibleNeighborless = TRUE;
 
 				}  // end if
-				else if( BitTest( otherNeighbor->status, POLY_VISIBLE ) == FALSE )
+				else if( BitIsSet( otherNeighbor->status, POLY_VISIBLE ) == FALSE )
 				{
 
 					// "we" are visible and "they" are not
@@ -2557,7 +2559,7 @@ void W3DVolumetricShadow::buildSilhouette(Int meshIndex, Vector3 *lightPosObject
 
 			}  // end if
 			else if( otherNeighbor != NULL &&
-							 BitTest( otherNeighbor->status, POLY_VISIBLE ) )
+							 BitIsSet( otherNeighbor->status, POLY_VISIBLE ) )
 			{
 
 				// "they" are visible and "we" are not

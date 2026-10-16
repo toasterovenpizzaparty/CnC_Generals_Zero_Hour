@@ -49,14 +49,15 @@
  *   WWProfileManager::Release_In_Order_Iterator -- Return an "in-order" iterator              *
  * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
+#include "zh_intrin.h"
 #include "always.h"
 #include "wwprofile.h"
-#include "fastallocator.h"
+#include "FastAllocator.h"
 #include "wwdebug.h"
 #include <windows.h>
 //#include "systimer.h"
 #include "systimer.h"
-#include "rawfile.h"
+#include "RAWFILE.H"
 #include "ffactory.h"
 #include "simplevec.h"
 #include "cpudetect.h"
@@ -96,26 +97,9 @@ WWINLINE double WWProfile_Get_Inv_Processor_Ticks_Per_Second(void)
  * HISTORY:                                                                                    *
  *   9/24/2000  gth : Created.                                                                 *
  *=============================================================================================*/
-inline void WWProfile_Get_Ticks(_int64 * ticks)
+inline void WWProfile_Get_Ticks(__int64 * ticks)
 {
-#ifdef _UNIX
-       *ticks = TIMEGETTIME();
-#else
-	__asm
-	{
-		push edx;
-		push ecx;
-		push eax;
-		mov ecx,ticks;
-		_emit 0Fh
-		_emit 31h
-		mov [ecx],eax;
-		mov [ecx+4],edx;
-		pop eax;
-		pop ecx;
-		pop edx;
-	}
-#endif
+	*ticks = (__int64)ZH_Rdtsc();	// was RDTSC inline assembly
 }
 
 
@@ -603,7 +587,7 @@ void	WWProfileManager::End_Collecting(const char* filename)
 					if (name[i]==',') name[i]='.';
 					if (name[i]==';') name[i]=':';
 				}
-				str.Format("ID: %d %s\r\n",ite.Peek_Value(),name);
+				str.Format("ID: %d %s\r\n",ite.Peek_Value(),name.Peek_Buffer());
 				file->Write(str.Peek_Buffer(),str.Get_Length());
 			}
 
@@ -1052,7 +1036,7 @@ WWMemoryAndTimeLog::WWMemoryAndTimeLog(const char* name)
 	IntermediateAllocSizeStart=AllocSizeStart;
 	StringClass tmp(0,true);
 	for (unsigned i=0;i<TabCount;++i) tmp+="\t";
-	WWRELEASE_SAY(("%s%s {\n",tmp,name));
+	WWRELEASE_SAY(("%s%s {\n",tmp.Peek_Buffer(),name));
 	TabCount++;
 }
 
@@ -1061,13 +1045,13 @@ WWMemoryAndTimeLog::~WWMemoryAndTimeLog()
 	if (TabCount>0) TabCount--;
 	StringClass tmp(0,true);
 	for (unsigned i=0;i<TabCount;++i) tmp+="\t";
-	WWRELEASE_SAY(("%s} ",tmp));
+	WWRELEASE_SAY(("%s} ",tmp.Peek_Buffer()));
 
 	unsigned current_time=WWProfile_Get_System_Time();
 	int current_alloc_count=FastAllocatorGeneral::Get_Allocator()->Get_Total_Allocation_Count();
 	int current_alloc_size=FastAllocatorGeneral::Get_Allocator()->Get_Total_Allocated_Size();
 	WWRELEASE_SAY(("IN TOTAL %s took %d.%3.3d s, did %d memory allocations of %d bytes\n",
-		Name,
+		Name.Peek_Buffer(),
 		(current_time - TimeStart)/1000, (current_time - TimeStart)%1000,
 		current_alloc_count - AllocCountStart,
 		current_alloc_size - AllocSizeStart));
@@ -1084,7 +1068,7 @@ void WWMemoryAndTimeLog::Log_Intermediate(const char* text)
 	StringClass tmp(0,true);
 	for (unsigned i=0;i<TabCount;++i) tmp+="\t";
 	WWRELEASE_SAY(("%s%s took %d.%3.3d s, did %d memory allocations of %d bytes\n",
-		tmp,
+		tmp.Peek_Buffer(),
 		text,
 		(current_time - IntermediateTimeStart)/1000, (current_time - IntermediateTimeStart)%1000,
 		current_alloc_count - IntermediateAllocCountStart,

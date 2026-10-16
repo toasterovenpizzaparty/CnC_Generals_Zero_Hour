@@ -102,7 +102,8 @@ FirewallHelperClass::FirewallHelperClass(void)
 	m_lastBehavior = FIREWALL_TYPE_UNKNOWN;
 	m_sourcePortAllocationDelta = 0;
 	m_lastSourcePortAllocationDelta = 0;
-	for (Int i = 0; i < MAX_SPARE_SOCKETS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SPARE_SOCKETS; ++i) {
 		m_spareSockets[i].port = 0;
 		m_messages[i].length = 0;
 		m_mangledPorts[i] = 0;
@@ -446,7 +447,8 @@ UnsignedShort FirewallHelperClass::getManglerResponse(UnsignedShort packetID, In
 
 	sockaddr_in addr;
 
-	for (Int i = 0; i < MAX_SPARE_SOCKETS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SPARE_SOCKETS; ++i) {
 		if (m_spareSockets[i].udp != NULL) {
 			ManglerMessage *message = findEmptyMessage();
 			if (message == NULL) {
@@ -723,7 +725,8 @@ Bool FirewallHelperClass::detectionBeginUpdate() {
 		return TRUE;
 	}
 
-	for (Int i=0 ; i<m_numManglers ; i++) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0 ; i<m_numManglers ; i++) {
 		UnsignedInt temp = 0;
 		temp = mangler_addresses[i][3];
 		temp += mangler_addresses[i][2] << 8;
@@ -909,7 +912,8 @@ Bool FirewallHelperClass::detectionTest3Update() {
 		** We should use a non-linear set of source ports so we can detect the NAT32 relative offset
 		** case.
 		*/
-		for (Int i=0 ; i<NUM_TEST_PORTS ; i++) {
+		Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+		for (i=0 ; i<NUM_TEST_PORTS ; i++) {
 			m_sparePorts[i] = getNextTemporarySourcePort(i);
 			if (!openSpareSocket(m_sparePorts[i])) {
 
@@ -956,7 +960,8 @@ Bool FirewallHelperClass::detectionTest3Update() {
 }
 
 Bool FirewallHelperClass::detectionTest3WaitForResponsesUpdate() {
-	for (Int i = 0; i < NUM_TEST_PORTS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < NUM_TEST_PORTS; ++i) {
 		if (m_mangledPorts[i] == 0) {
 			m_mangledPorts[i] = getManglerResponse(m_packetID + i);
 			if (m_mangledPorts[i] != 0) {
@@ -1364,7 +1369,8 @@ Int FirewallHelperClass::getNATPortAllocationScheme(Int numPorts, UnsignedShort 
 	** 4. Check for relative scheme skipping 'n' ports. NAT32 behaves this way, it skips 100 ports
 	** each time.
 	*/
-	for (Int i=0 ; i<numPorts ; i++) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0 ; i<numPorts ; i++) {
 		mangledPorts[i] -= originalPorts[i];
 	}
 
@@ -1525,7 +1531,8 @@ Int FirewallHelperClass::getFirewallRetries(FirewallBehaviorType behavior)
  *  returns TRUE if successful, FALSE otherwise.
  */
 Bool FirewallHelperClass::openSpareSocket(UnsignedShort port) {
-	for (Int i = 0; i < MAX_SPARE_SOCKETS; ++i) {
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i = 0; i < MAX_SPARE_SOCKETS; ++i) {
 		if (m_spareSockets[i].port == 0) {
 			break;
 		}

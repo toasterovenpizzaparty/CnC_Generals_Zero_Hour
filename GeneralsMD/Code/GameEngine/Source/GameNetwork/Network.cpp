@@ -37,7 +37,7 @@
 #include "Common/Player.h"
 #include "Common/PlayerList.h"
 #include "GameNetwork/NetworkInterface.h"
-#include "GameNetwork/Udp.h"
+#include "GameNetwork/udp.h"
 #include "GameNetwork/Transport.h"
 #include "GameNetwork/NetworkTiming.h"
 #include "strtok_r.h"

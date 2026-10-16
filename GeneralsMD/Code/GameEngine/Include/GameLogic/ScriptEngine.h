@@ -122,12 +122,15 @@ typedef AllObjectTypes::iterator AllObjectTypesIt;
 typedef std::vector<NamedReveal> VecNamedReveal;
 typedef VecNamedReveal::iterator VecNamedRevealIt;
 
+class ScriptEngine;
 class AttackPriorityInfo : public MemoryPoolObject, public Snapshot
 {
 	MEMORY_POOL_GLUE_WITH_USERLOOKUP_CREATE(AttackPriorityInfo, "AttackPriorityInfo")		
 
 // friend bad for MPOs. (srj)
-//friend class ScriptEngine;
+// ...but ScriptEngine holds a plain member array of these (m_attackPriorityInfo), so it needs
+// access to the protected destructor.  Visual C++ 6 did not enforce that; standard C++ does.
+friend class ScriptEngine;
 
 public:
 

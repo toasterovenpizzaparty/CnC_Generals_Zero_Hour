@@ -101,7 +101,13 @@ inline ParticleSystemManager* Win32GameEngine::createParticleSystemManager( void
 
 inline NetworkInterface *Win32GameEngine::createNetwork( void ) { return NetworkInterface::createNetwork(); }
 inline Radar *Win32GameEngine::createRadar( void ) { return NEW W3DRadar; }
+#if ZH_HAS_ATL
 inline WebBrowser *Win32GameEngine::createWebBrowser( void ) { return NEW CComObject<W3DWebBrowser>; }
+#else
+inline WebBrowser *Win32GameEngine::createWebBrowser( void ) { return NULL; }
+#endif
+// Uses the Miles Sound System API: the real SDK with -DZH_USE_MILES=ON, otherwise the miniaudio
+// implementation in Compat/MSS.
 inline AudioManager *Win32GameEngine::createAudioManager( void ) { return NEW MilesAudioManager; }
  
 #endif  // end __WIN32GAMEENGINE_H_

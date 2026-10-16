@@ -1120,7 +1120,8 @@ void GameClient::preloadAssets( TimeOfDay timeOfDay )
 
 	GlobalMemoryStatus(&before);
 	extern std::vector<AsciiString>	debrisModelNamesGlobalHack;
-	for (Int i=0; i<debrisModelNamesGlobalHack.size(); ++i)
+	Int i;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (i=0; i<debrisModelNamesGlobalHack.size(); ++i)
 	{
 		TheDisplay->preloadModelAssets(debrisModelNamesGlobalHack[i]);
 	}

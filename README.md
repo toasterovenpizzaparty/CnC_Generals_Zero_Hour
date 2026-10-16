@@ -1,6 +1,10 @@
 
 # Command & Conquer Generals (inc. Zero Hour) Source Code
 
+> **This fork** builds Zero Hour with CMake and a modern compiler, with replacements for the
+> proprietary SDKs ([BUILDING.md](BUILDING.md)), and fixes multiplayer stalls and desyncs
+> ([NETWORK_AND_DETERMINISM.md](NETWORK_AND_DETERMINISM.md)). The original README follows.
+
 This repository includes source code for Command & Conquer Generals, and its expansion pack Zero Hour. This release provides support to the Steam Workshop for both games ([C&C Generals](https://steamcommunity.com/workshop/browse/?appid=2229870) and [C&C Generals - Zero Hour](https://steamcommunity.com/workshop/browse/?appid=2732960)).
 
 
