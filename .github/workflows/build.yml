@@ -1,0 +1,128 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Cross-compile the Zero Hour executable for 32-bit Windows with MinGW-w64 (GCC 13).
+  game-win32:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-i686-posix ninja-build cmake ccache
+
+      - name: Compiler cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-win32-${{ github.sha }}
+          restore-keys: ccache-win32-
+
+      - name: Configure
+        run: >
+          cmake -S GeneralsMD/Code -B build -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-i686.cmake
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Package
+        run: |
+          mkdir dist
+          i686-w64-mingw32-strip -o dist/generalszh.exe build/generalszh.exe
+          cp NETWORK_AND_DETERMINISM.md dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generalszh-win32
+          path: dist/
+
+  # The deterministic math must produce bit-identical results with every compiler and CPU.
+  # Build the test programs with several compilers; the Windows job runs them on real Windows.
+  determinism-linux:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: GeneralsMD/Code/Tests/Determinism
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install compilers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang g++-mingw-w64-i686-posix g++-mingw-w64-x86-64-posix
+
+      - name: DetMath with GCC and Clang
+        run: |
+          set -e
+          inc=-I../../Libraries/Source/WWVegas/WWMath
+          for cxx in g++ clang++; do
+            for opt in -O0 -O2 -O3; do
+              $cxx $opt -ffp-contract=off $inc detmath_test.cpp -o detmath_test
+              ./detmath_test | tee out.txt
+              grep -q 'RESULT HASH: ba0d1902ead0e3eb' out.txt
+              grep -q 'ALL TESTS PASSED' out.txt
+            done
+          done
+
+      - name: Network timing model
+        run: |
+          g++ -O2 -I../../GameEngine/Include networktiming_test.cpp -o networktiming_test
+          ./networktiming_test
+
+      - name: Cross-compile tests for Windows
+        run: |
+          set -e
+          mkdir -p win
+          inc=-I../../Libraries/Source/WWVegas/WWMath
+          i686-w64-mingw32-g++-posix -O2 -ffp-contract=off -msse2 -mfpmath=sse -static $inc detmath_test.cpp -o win/detmath_mingw32.exe
+          x86_64-w64-mingw32-g++-posix -O2 -ffp-contract=off -static $inc detmath_test.cpp -o win/detmath_mingw64.exe
+          i686-w64-mingw32-g++-posix -O2 -static -I../../GameEngine/Include networktiming_test.cpp -o win/networktiming_mingw32.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: determinism-tests-win
+          path: GeneralsMD/Code/Tests/Determinism/win/
+
+  determinism-windows:
+    needs: determinism-linux
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+        working-directory: GeneralsMD/Code/Tests/Determinism
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: determinism-tests-win
+          path: GeneralsMD/Code/Tests/Determinism/win
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: DetMath with MSVC (x64) and the MinGW builds
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cl /nologo /O2 /fp:precise /EHsc /I..\..\Libraries\Source\WWVegas\WWMath detmath_test.cpp /Fe:detmath_msvc64.exe
+          if ($LASTEXITCODE) { exit 1 }
+          foreach ($exe in 'detmath_msvc64.exe', 'win\detmath_mingw32.exe', 'win\detmath_mingw64.exe') {
+            Write-Host "== $exe"
+            $out = & ".\$exe" | Out-String
+            Write-Host $out
+            if ($out -notmatch 'RESULT HASH: ba0d1902ead0e3eb') { throw "$exe produced a different hash" }
+          }
+
+      - name: Network timing model (MinGW build)
+        run: win\networktiming_mingw32.exe
