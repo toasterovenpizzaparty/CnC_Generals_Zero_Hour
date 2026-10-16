@@ -86,6 +86,8 @@ jobs:
           i686-w64-mingw32-g++-posix -O2 -ffp-contract=off -msse2 -mfpmath=sse -static $inc detmath_test.cpp -o win/detmath_mingw32.exe
           x86_64-w64-mingw32-g++-posix -O2 -ffp-contract=off -static $inc detmath_test.cpp -o win/detmath_mingw64.exe
           i686-w64-mingw32-g++-posix -O2 -static -I../../GameEngine/Include networktiming_test.cpp -o win/networktiming_mingw32.exe
+          i686-w64-mingw32-g++-posix -O2 -static -I../../Compat -I../../Libraries/Source/miniaudio \
+            ../Audio/mss_test.cpp ../../Compat/MSS/mss_miniaudio.cpp -lole32 -lwinmm -o win/mss_test_mingw32.exe
 
       - uses: actions/upload-artifact@v4
         with:
@@ -126,3 +128,8 @@ jobs:
 
       - name: Network timing model (MinGW build)
         run: win\networktiming_mingw32.exe
+
+      # Miles API on miniaudio.  CI machines have no sound card; miniaudio then plays on a null
+      # device in real time, which is enough to check decoding, timing, callbacks and loops.
+      - name: Audio layer (MinGW build)
+        run: win\mss_test_mingw32.exe

@@ -24,7 +24,7 @@ set(CMAKE_CXX_EXTENSIONS ON)
 
 option(ZH_WARNINGS "Show compiler warnings (very noisy on this code base)" OFF)
 # Proprietary SDKs that are not part of the source release.  Turn on only if you have them.
-option(ZH_USE_MILES "Build the Miles Sound System audio backend (needs the Miles 6 SDK)" OFF)
+option(ZH_USE_MILES "Link the real Miles Sound System 6 SDK instead of the miniaudio implementation of its API" OFF)
 option(ZH_USE_BINK "Build the Bink video player (needs the Bink SDK)" OFF)
 
 set(ZH_CODE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -138,16 +138,13 @@ zh_library(gameengine SOURCES ${GAMEENGINE_SOURCES}
 # The original project used PreRTS.h as precompiled header (/Yu"PreRTS.h"); every .cpp includes it first.
 target_precompile_headers(gameengine PRIVATE ${ZH_CODE}/GameEngine/Include/Precompiled/PreRTS.h)
 
-if(NOT ZH_USE_MILES)
-    list(FILTER GAMEENGINEDEVICE_SOURCES EXCLUDE REGEX "MilesAudioDevice/")
-endif()
 if(NOT ZH_USE_BINK)
     list(FILTER GAMEENGINEDEVICE_SOURCES EXCLUDE REGEX "VideoDevice/Bink/")
 endif()
 zh_library(gameenginedevice SOURCES ${GAMEENGINEDEVICE_SOURCES}
     INCLUDES ${ZH_CODE}/GameEngineDevice/Include ${ZH_CODE}/Main
     DEFINES IG_DEBUG_STACKTRACE
-    LINK gameengine ww3d2 wwsaveload wwutil zh_benchmark)
+    LINK gameengine ww3d2 wwsaveload wwutil zh_benchmark $<IF:$<BOOL:${ZH_USE_MILES}>,mss32,zh_mss>)
 # GameEngine calls the device layer through factory functions (CreateCDManager, MOTDSystem, ...):
 # a link-only dependency that closes the cycle, so the linker repeats both libraries.
 target_link_libraries(gameengine INTERFACE "$<LINK_ONLY:gameenginedevice>")

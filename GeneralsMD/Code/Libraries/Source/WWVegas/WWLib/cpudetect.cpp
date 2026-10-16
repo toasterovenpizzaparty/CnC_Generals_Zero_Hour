@@ -897,11 +897,7 @@ void CPUDetectClass::Init_Processor_Log()
 		(OSVersionBuildNumber&0xff000000)>>24,
 		(OSVersionBuildNumber&0xff0000)>>16,
 		(OSVersionBuildNumber&0xffff)));
-#ifdef WIN32
-   SYSLOG(("OS-Info: %s\r\n", OSVersionExtraInfo));
-#elif defined(_UNIX)
-   SYSLOG(("OS-Info: %s\r\n", OSVersionExtraInfo.Peek_Buffer()));
-#endif
+   SYSLOG(("OS-Info: %s\r\n", OSVersionExtraInfo.Peek_Buffer()));	// was the StringClass itself, which only MSVC passes through "..." as its char*
 
 	SYSLOG(("Processor: %s\r\n",CPUDetectClass::Get_Processor_String()));
 	SYSLOG(("Clock speed: ~%dMHz\r\n",CPUDetectClass::Get_Processor_Speed()));
@@ -912,11 +908,7 @@ void CPUDetectClass::Init_Processor_Log()
 	case 2: cpu_type="Dual"; break;
 	case 3: cpu_type="*Intel Reserved*"; break;
 	}
-#ifdef WIN32
-   SYSLOG(("Processor type: %s\r\n", cpu_type));
-#elif defined(_UNIX)
-   SYSLOG(("Processor type: %s\r\n", cpu_type.Peek_Buffer()));
-#endif
+   SYSLOG(("Processor type: %s\r\n", cpu_type.Peek_Buffer()));	// was the StringClass itself, which only MSVC passes through "..." as its char*
 
 	SYSLOG(("\r\n"));
 
@@ -1160,12 +1152,15 @@ void Get_OS_Info(
 	unsigned build_minor=(OSVersionBuildNumber&0xff0000)>>16;
 	unsigned build_sub=(OSVersionBuildNumber&0xffff);
 
+	// Start from "unknown": the original left the strings uninitialized for any NT version after
+	// XP, and the compact log then printed (or crashed on) whatever was on the stack.
+	memset(&os_info,0,sizeof(os_info));
+	os_info.Code="UNKNOWN";
+	os_info.SubCode="UNKNOWN";
+	os_info.VersionString="UNKNOWN";
+
 	switch (OSVersionPlatformId) {
 	default:
-		memset(&os_info,0,sizeof(os_info));
-		os_info.Code="UNKNOWN";
-		os_info.SubCode="UNKNOWN";
-		os_info.VersionString="UNKNOWN";
 		break;
 	case VER_PLATFORM_WIN32_WINDOWS:
 		{
@@ -1223,5 +1218,16 @@ void Get_OS_Info(
 			os_info.Code="WINXX";
 			return;
 		}
+		if (OSVersionNumberMajor==6) {
+			// Without a compatibility manifest, Windows 8.1, 10 and 11 report themselves as 6.2.
+			static const char* const nt6[]={"WINVISTA","WIN7","WIN8","WIN81"};
+			os_info.Code=OSVersionNumberMinor<4 ? nt6[OSVersionNumberMinor] : "WIN6X";
+			return;
+		}
+		if (OSVersionNumberMajor>=10) {
+			os_info.Code="WIN10";
+			return;
+		}
+		break;
 	}
 }

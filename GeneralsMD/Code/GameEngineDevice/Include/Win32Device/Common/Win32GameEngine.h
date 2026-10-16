@@ -38,11 +38,7 @@
 #include "Common/GameEngine.h"
 #include "GameLogic/GameLogic.h"
 #include "GameNetwork/NetworkInterface.h"
-#if ZH_USE_MILES
 #include "MilesAudioDevice/MilesAudioManager.h"
-#else
-#include "NullAudioDevice/NullAudioManager.h"
-#endif
 #include "Win32Device/Common/Win32BIGFileSystem.h"
 #include "Win32Device/Common/Win32LocalFileSystem.h"
 #include "W3DDevice/Common/W3DModuleFactory.h"
@@ -110,11 +106,8 @@ inline WebBrowser *Win32GameEngine::createWebBrowser( void ) { return NEW CComOb
 #else
 inline WebBrowser *Win32GameEngine::createWebBrowser( void ) { return NULL; }
 #endif
-#if ZH_USE_MILES
+// Uses the Miles Sound System API: the real SDK with -DZH_USE_MILES=ON, otherwise the miniaudio
+// implementation in Compat/MSS.
 inline AudioManager *Win32GameEngine::createAudioManager( void ) { return NEW MilesAudioManager; }
-#else
-// Built without the Miles Sound System SDK: no sound (see NullAudioManager.h).
-inline AudioManager *Win32GameEngine::createAudioManager( void ) { return NEW NullAudioManager; }
-#endif
  
 #endif  // end __WIN32GAMEENGINE_H_
