@@ -655,7 +655,8 @@ void GameEngine::init( int argc, char *argv[] )
 			}
 			else if (fname.endsWithNoCase(".rep"))
 			{
-				TheRecorder->playbackFile(fname);
+				if (!TheRecorder->playbackFile(fname))
+					ReplayCheckFinish(REPLAYCHECK_LOAD_FAILED);	// no-op unless -replayCheck
 			}
 		}
 

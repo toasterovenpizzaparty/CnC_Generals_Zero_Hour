@@ -53,6 +53,25 @@ not been tested. So far only GCC has been used to fix the code base.
 - **32-bit only.** The x64 build is not done yet.
 - The code base has not been tested in a real game session yet. Please report what you see.
 
+## Checking that a build simulates identically (replays)
+
+`generalszh.exe -replayCheck <file.rep>` plays a replay without drawing and as fast as possible. It
+compares the game state checksums with the ones stored in the replay, then quits. Exit code:
+`0` all matched, `1` mismatch, `2` the replay holds no checksums, `3` the replay could not be loaded.
+Each run adds a line to `ReplayCheck.txt` in the game's user data folder. A mismatch line also
+gives the first frame that differed.
+
+To check a whole folder:
+
+    powershell -ExecutionPolicy Bypass -File GeneralsMD\Code\Tests\Replays\check-replays.ps1 -Exe <zero hour folder>\generalszh.exe -Replays <folder with .rep files>
+
+Replays recorded with the original EA executable **will not match**: this fork changes the
+simulation's math on purpose. Record a few games with this fork's executable and keep them as
+references. Check every new build against them, especially before a LAN session where everyone
+updates. This needs the game data, so it runs on your machine, not in CI. It is untested so far: the
+replay checksum comparison is the game's own code, and the original developers believed it to be
+unreliable.
+
 ## Tests
 
 The tests run on every push (Linux and Windows):

@@ -157,3 +157,20 @@ protected:
 
 extern RecorderClass *TheRecorder;
 RecorderClass *createRecorder();
+
+// Replay check (-replayCheck <file>): play a replay without drawing and as fast as possible,
+// compare the simulation's CRCs with the ones stored in the replay, then quit.  Used to verify that
+// a build still simulates exactly like the build that recorded the replay.
+//   exit code 0 = every CRC matched, 1 = mismatch, 2 = the replay holds no CRCs to compare,
+//             3 = the replay could not be loaded
+// One line per run is appended to ReplayCheck.txt in the user data directory.
+enum ReplayCheckResult
+{
+	REPLAYCHECK_PASS = 0,
+	REPLAYCHECK_MISMATCH = 1,
+	REPLAYCHECK_NO_CRCS = 2,
+	REPLAYCHECK_LOAD_FAILED = 3
+};
+extern Bool TheReplayCheckMode;
+extern Int TheReplayCheckExitCode;
+void ReplayCheckFinish(ReplayCheckResult result);
