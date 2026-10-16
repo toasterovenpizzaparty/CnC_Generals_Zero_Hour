@@ -14,7 +14,9 @@ namespace Lockstep {
 int EnetTransport::s_instances = 0;
 
 EnetTransport::EnetTransport()
-	: m_host(NULL), m_timeoutMinimum(3000), m_timeoutMaximum(10000)
+	// A peer that does not answer for 10 s (30 s at most, ENet's default) is gone.  Shorter would
+	// drop a player whose game merely stalls for a moment (e.g. while its window is dragged).
+	: m_host(NULL), m_timeoutMinimum(10000), m_timeoutMaximum(30000)
 {
 	if (s_instances++ == 0) {
 		enet_initialize();

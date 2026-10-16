@@ -128,6 +128,7 @@ public:
 	std::map<uint32_t, LinkProfile> linkOf;		// ip -> link to the host
 	std::vector<SimTransport *> transports;
 	std::map<uint32_t, bool> crashed;			// ip -> machine is dead (sends and receives nothing)
+	std::map<uint32_t, bool> cutOff;			// ip -> machine runs but its network is gone
 
 	SimNetwork(uint64_t seed) : now(0), rng(seed) {}
 
@@ -211,6 +212,32 @@ public:
 		return true;
 	}
 
+	// A machine loses its network: both sides notice after the connection timeout.
+	void partition(uint32_t ip, double timeoutMs)
+	{
+		cutOff[ip] = true;
+		for (size_t i = 0; i < conns.size(); ++i) {
+			Connection &c = conns[i];
+			if (!c.open || (c.end[0]->m_ip != ip && c.end[1]->m_ip != ip)) continue;
+			c.open = false;
+			for (int e = 0; e < 2; ++e) {
+				Message m;
+				m.at = now + timeoutMs;
+				m.event.type = TransportEvent::DISCONNECTED;
+				m.event.peer = c.peerAt[e];
+				m.toEndpoint = (int)i * 2 + e;
+				inflight.push_back(m);
+			}
+		}
+		for (size_t i = 0; i < inflight.size(); ) {
+			const Message &m = inflight[i];
+			Connection &c = conns[m.toEndpoint / 2];
+			bool involves = c.end[0]->m_ip == ip || c.end[1]->m_ip == ip;
+			if (involves && m.event.type != TransportEvent::DISCONNECTED) inflight.erase(inflight.begin() + i);
+			else ++i;
+		}
+	}
+
 	// A crashed machine's peers notice after the connection timeout.
 	void crash(uint32_t ip, double timeoutMs)
 	{
@@ -253,7 +280,7 @@ void SimTransport::close()
 PeerId SimTransport::connect(uint32_t ipv4, uint16_t port)
 {
 	SimTransport *other = m_net->find(ipv4, port);
-	if (!other) return NO_PEER;
+	if (!other || m_net->cutOff[m_ip] || m_net->cutOff[ipv4]) return NO_PEER;
 	SimNetwork::Connection c;
 	c.end[0] = this;
 	c.end[1] = other;
@@ -288,7 +315,7 @@ void SimTransport::disconnect(PeerId peer)
 
 bool SimTransport::send(PeerId peer, int channel, const void *data, size_t size)
 {
-	if (m_net->crashed[m_ip]) return false;
+	if (m_net->crashed[m_ip] || m_net->cutOff[m_ip]) return false;
 	if (peer < 0 || (size_t)peer >= m_conns.size() || m_conns[peer] < 0) return false;
 	int idx = m_conns[peer];
 	SimNetwork::Connection &c = m_net->conns[idx];
@@ -386,11 +413,13 @@ struct GameSetup
 	int slowSlot; double slowUpdateMs;	// a slow computer: game loop every slowUpdateMs
 	int corruptSlot; Frame corruptAtFrame;	// a desync
 	int hangSlot; double hangAtMs;		// a player's game hangs; its connection stays up
+	int cutSlot; double cutAtMs;		// a player's network is cut off; its game runs on
+	double hostStartMs;					// the host opens its port this late
 	uint32_t dropAfterMs;				// SessionConfig::dropAfterMs
 	uint64_t seed;
 
 	GameSetup() : players(3), seconds(60), commandsPerSecond(2), leaveSlot(-1), leaveAtMs(0), crashSlot(-1), crashAtMs(0),
-		slowSlot(-1), slowUpdateMs(0), corruptSlot(-1), corruptAtFrame(0), hangSlot(-1), hangAtMs(0), dropAfterMs(0), seed(1)
+		slowSlot(-1), slowUpdateMs(0), corruptSlot(-1), corruptAtFrame(0), hangSlot(-1), hangAtMs(0), cutSlot(-1), cutAtMs(0), hostStartMs(0), dropAfterMs(0), seed(1)
 	{
 		for (int i = 0; i < MAX_PLAYERS; ++i) links[i] = WIRED;
 	}
@@ -425,7 +454,8 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 		if (i == setup.slowSlot) p.updateIntervalMs = setup.slowUpdateMs;
 		if (i == setup.corruptSlot) p.corrupt = true;
 	}
-	players[0].session->start(0);	// the host first, so clients can connect
+	bool hostStarted = setup.hostStartMs <= 0;
+	if (hostStarted) players[0].session->start(0);	// the host first, so clients can connect
 	for (int i = 1; i < setup.players; ++i) players[i].session->start(0);
 
 	const double end = setup.seconds * 1000.0;
@@ -433,9 +463,13 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 	bool loadedSent = false;
 	for (net.now = 0; net.now < end; net.now += step) {
 		uint32_t ms = (uint32_t)net.now;
+		if (!hostStarted && net.now >= setup.hostStartMs) {
+			players[0].session->start(ms);
+			hostStarted = true;
+		}
 		for (int i = 0; i < setup.players; ++i) {
 			Player &p = players[i];
-			if (p.left || p.crashed) continue;
+			if (p.left || p.crashed || (i == 0 && !hostStarted)) continue;
 			p.session->update(ms);
 
 			Event e;
@@ -445,7 +479,7 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 			}
 
 			// load instantly once connected (after 200 ms)
-			if (!loadedSent && net.now >= 200) {
+			if (!loadedSent && net.now >= 200 + setup.hostStartMs) {
 				for (int j = 0; j < setup.players; ++j) players[j].session->sendLoadComplete();
 				loadedSent = true;
 			}
@@ -522,6 +556,9 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 			q.session->leave();
 			players[setup.leaveSlot].left = true;
 		}
+		if (setup.cutSlot >= 0 && !net.cutOff[base.players[setup.cutSlot].ip] && net.now >= setup.cutAtMs) {
+			net.partition(base.players[setup.cutSlot].ip, 3000);
+		}
 		if (setup.crashSlot >= 0 && !players[setup.crashSlot].crashed && net.now >= setup.crashAtMs) {
 			players[setup.crashSlot].crashed = true;
 			net.crash(base.players[setup.crashSlot].ip, 3000);
@@ -543,11 +580,11 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 				if (players[i].hashAt[k] != players[j].hashAt[k]) { r.identical = false; break; }
 		}
 	r.framesPlayed = common == (size_t)-1 ? 0 : (int)common;
-	if (setup.hangSlot >= 0) {
-		// the hung player is not part of the comparison of who kept playing
+	if (setup.hangSlot >= 0 || setup.cutSlot >= 0) {
+		// the hung or cut-off player is not part of the comparison of who kept playing
 		common = (size_t)-1;
 		for (int i = 0; i < setup.players; ++i)
-			if (i != setup.hangSlot && !players[i].left && !players[i].crashed) common = std::min(common, players[i].hashAt.size());
+			if (i != setup.hangSlot && i != setup.cutSlot && !players[i].left && !players[i].crashed) common = std::min(common, players[i].hashAt.size());
 		r.framesPlayed = (int)common;
 	}
 
@@ -559,9 +596,9 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 		if (obs.left || obs.crashed) continue;
 		for (std::map<std::pair<int, uint32_t>, int>::const_iterator it = obs.executed.begin(); it != obs.executed.end(); ++it)
 			if (it->second != 1) r.exactlyOnce = false;
-		if (i == setup.hangSlot) continue;
+		if (i == setup.hangSlot || i == setup.cutSlot) continue;
 		for (int s = 0; s < setup.players; ++s) {
-			if (players[s].left || players[s].crashed || s == setup.hangSlot) continue;
+			if (players[s].left || players[s].crashed || s == setup.hangSlot || s == setup.cutSlot) continue;
 			for (std::map<uint32_t, double>::const_iterator it = players[s].issuedAtMs.begin(); it != players[s].issuedAtMs.end(); ++it)
 				if (it->second < end - 2000 && !obs.executed.count(std::make_pair(s, it->first))) r.exactlyOnce = false;
 		}
@@ -574,7 +611,7 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 	for (int i = 0; i < setup.players; ++i) {
 		const Player &p = players[i];
 		for (size_t k = 0; k < p.inputDelayMs.size(); ++k) { sum += p.inputDelayMs[k]; mx = std::max(mx, p.inputDelayMs[k]); ++n; }
-		if (p.left || p.crashed || i == setup.hangSlot) continue;
+		if (p.left || p.crashed || i == setup.hangSlot || i == setup.cutSlot) continue;
 		r.frozenPercentWorst = std::max(r.frozenPercentWorst, 100.0 * p.frozenMs / end);
 		r.longestFreezeMs = std::max(r.longestFreezeMs, p.longestFreezeMs);
 	}
@@ -750,6 +787,72 @@ static void TestHang()
 	printf("       longest freeze %.0f ms, frames played %d\n", r.longestFreezeMs, r.framesPlayed);
 	CHECK(r.longestFreezeMs > 9000 && r.longestFreezeMs < 13000, "the game waited about the drop time, then went on");
 	CHECK(r.framesPlayed > 50 * 30 * 0.7, "and continued (%d frames)", r.framesPlayed);
+}
+
+static void TestLateHost()
+{
+	printf("The host opens its port 1.5 s after the clients start\n");
+	GameSetup s;
+	s.players = 3;
+	s.seconds = 30;
+	s.hostStartMs = 1500;
+	s.seed = 91;
+	GameResult r = RunSimulatedGame(s);
+	CHECK(r.identical && r.exactlyOnce, "the clients kept trying, connected, and the game ran identically");
+	CHECK(r.framesPlayed > (30 - 2) * 30 * 0.95, "full game (%d frames)", r.framesPlayed);
+}
+
+static void TestCutOff()
+{
+	printf("A laptop's network is cut off after 20 s; its game keeps running\n");
+	GameSetup s;
+	s.players = 3;
+	s.seconds = 45;
+	s.cutSlot = 2;
+	s.cutAtMs = 20000;
+	s.seed = 92;
+	std::vector<Player> players;
+	GameResult r = RunSimulatedGame(s, &players);
+	CHECK(r.identical, "the others stay identical");
+	bool left = !players[0].leftEvents.empty() && players[0].leftEvents == players[1].leftEvents && players[0].leftEvents[0].second == 2;
+	CHECK(left, "the others saw it leave on the same frame");
+	CHECK(r.framesPlayed > 45 * 30 * 0.8, "and went on (%d frames)", r.framesPlayed);
+	CHECK(players[2].hostLost, "the cut-off laptop knows it lost the game (no host change to itself)");
+	CHECK(players[2].hashAt.size() < 25 * 30, "and did not play on alone (%d frames)", (int)players[2].hashAt.size());
+}
+
+static void TestEarlyFile()
+{
+	printf("The host sends a file before the clients have connected\n");
+	SimNetwork net(9);
+	SessionConfig base;
+	base.hostSlot = 0;
+	for (int i = 0; i < 3; ++i) { base.players[i].human = true; base.players[i].ip = 0x0a000001 + i; base.players[i].port = 8088; }
+	SimTransport t0(&net, base.players[0].ip), t1(&net, base.players[1].ip), t2(&net, base.players[2].ip);
+	SessionConfig c[3];
+	for (int i = 0; i < 3; ++i) { c[i] = base; c[i].localSlot = i; }
+	Session s0(&t0, c[0]), s1(&t1, c[1]), s2(&t2, c[2]);
+	s0.start(0);
+	std::vector<uint8_t> chunk(5000, 3);
+	s0.announceFile(5, "maps/early.map", 5000, (1 << 1) | (1 << 2));
+	s0.sendFileData(5, 0, chunk);
+	s0.sendLoadProgress(40);
+	int got[3] = { 0, 0, 0 }, progress[3] = { 0, 0, 0 };
+	for (net.now = 0; net.now < 2000; net.now += 1) {
+		if (net.now == 300) { s1.start(300); s2.start(300); }	// the clients connect later
+		Session *s[3] = { &s0, &s1, &s2 };
+		for (int i = 0; i < 3; ++i) {
+			if (i > 0 && net.now < 300) continue;
+			s[i]->update((uint32_t)net.now);
+			Event e;
+			while (s[i]->pollEvent(e)) {
+				if (e.type == Event::FILE_DATA && e.data.size() == 5000) ++got[i];
+				if (e.type == Event::LOAD_PROGRESS && e.slot == 0 && e.value == 40) ++progress[i];
+			}
+		}
+	}
+	CHECK(got[1] == 1 && got[2] == 1, "both clients received the file once they connected");
+	CHECK(progress[1] == 1 && progress[2] == 1, "and the host's loading progress");
 }
 
 static void TestSlowComputer()
@@ -941,6 +1044,9 @@ int main()
 	TestHostChange(false);
 	TestHostChange(true);
 	TestHang();
+	TestLateHost();
+	TestCutOff();
+	TestEarlyFile();
 	TestSlowComputer();
 	TestDesync();
 	TestRealEnet();

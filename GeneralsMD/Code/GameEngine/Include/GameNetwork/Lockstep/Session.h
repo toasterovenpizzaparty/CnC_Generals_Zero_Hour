@@ -54,6 +54,8 @@ enum
 	CUSHION_BUCKET_MS = 500,		// clients report their smallest cushion over the last 0.5-1 s
 	STATUS_MIN_INTERVAL_MS = 100,	// clients report at least this often, even when not advancing
 	MIGRATION_TIMEOUT_MS = 5000,	// a new host waits this long for the other players to reconnect
+	CONNECT_RETRY_MS = 500,			// before the game starts, a client keeps trying to reach the host...
+	CONNECT_GIVE_UP_MS = 60000,		// ...for this long (the host may start listening a little later)
 	LAG_SLOW_FRAMES = 4,			// a client this far behind (beyond the input delay) slows the host by 20%
 	LAG_SLOWER_FRAMES = 12,			// ... this far: 50%
 	LAG_STOP_FRAMES = 30,			// ... this far: the host waits for it
@@ -234,6 +236,7 @@ private:
 	void handleMessage(PeerId peer, int channel, const std::vector<uint8_t> &data, uint32_t nowMs);
 	void sendTo(int slot, int channel, const ByteWriter &w);
 	void sendToHost(int channel, const ByteWriter &w);
+	void sendHandshake(const ByteWriter &w);	// to the host, before it accepted us
 	void broadcast(int channel, const ByteWriter &w, int exceptSlot = -1);
 	void deliverBulk(int fromSlot, uint32_t mask, const ByteWriter &w, const Event &localEvent);
 	void storeTurn(const Turn &turn);
@@ -275,7 +278,15 @@ private:
 	SessionConfig m_config;
 	Remote m_remote[MAX_PLAYERS];
 	PeerId m_hostPeer;
-	bool m_welcomed;
+	bool m_welcomed;					// client: the current host accepted us
+	uint32_t m_connectDeadlineMs;		// client: stop retrying the first connection then
+	uint32_t m_reconnectAtMs;			// client: retry the connection then (0 = no retry pending)
+	bool m_isolated;					// host change found nobody: we are the one cut off
+	// Messages to players that are not connected yet (sent once they are): the host may announce
+	// a file or report loading before every client has finished connecting.
+	struct Queued { int channel; std::vector<uint8_t> data; };
+	std::vector<Queued> m_queuedToSlot[MAX_PLAYERS];
+	std::vector<Queued> m_queuedToHost;
 	bool m_inGame[MAX_PLAYERS];			// frame-synchronized membership
 	bool m_running;
 	bool m_started;

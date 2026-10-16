@@ -163,6 +163,12 @@ the host's game. Before a session, record a replay and check it with `-replayChe
   `Network.cpp` is no longer built; the rest is compiled but unused. It can be deleted once the new
   layer has been played.
 - **The disconnect screen shows only your own vote**, not everyone's vote counts.
+- **A machine that does not answer for 10 s is dropped** (ENet's connection timeout; the original
+  waited 60 s on its disconnect screen). Shorter would drop a laptop whose game merely stalls for a
+  moment; longer would make everyone wait that long when a computer really dies.
+- **In a two-player game a network cut splits the game**: each side sees the other leave. With
+  three or more players, a machine that finds itself alone after losing the host stops instead of
+  playing on by itself.
 - **16 uses of `GameClientRandomValue` inside `GameLogic` were not audited.** The client-side
   random generator must never influence simulation state.
 - **Online (GameSpy) play** is not supported: GameSpy shut down in 2014.

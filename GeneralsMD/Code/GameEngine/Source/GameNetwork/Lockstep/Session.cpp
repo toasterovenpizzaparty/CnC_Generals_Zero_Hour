@@ -25,7 +25,8 @@ const uint32_t MAX_EVENTS_PER_TURN = 64;
 // Construction, start, shutdown
 // ================================================================================================
 Session::Session(Transport *transport, const SessionConfig &config)
-	: m_transport(transport), m_config(config), m_hostPeer(NO_PEER), m_welcomed(false), m_running(false), m_started(false),
+	: m_transport(transport), m_config(config), m_hostPeer(NO_PEER), m_welcomed(false), m_connectDeadlineMs(0),
+	m_reconnectAtMs(0), m_isolated(false), m_running(false), m_started(false),
 	m_left(false), m_localLoaded(false), m_nowMs(0), m_lastTaken(config.firstFrame - 1),
 	m_lastReceived(config.firstFrame - 1), m_inputDelay(MIN_INPUT_DELAY), m_nextFrameMs(0),
 	m_waitingShown(false), m_starvedSinceMs(0), m_nextSeq(1), m_desyncAnnounced(false),
@@ -75,11 +76,12 @@ bool Session::start(uint32_t nowMs)
 	}
 	m_running = true;
 	if (!isHost()) {
+		// The host may open its port a moment after us: keep trying for a while.
+		m_connectDeadlineMs = nowMs + CONNECT_GIVE_UP_MS;
 		const PlayerAddress &host = m_config.players[m_config.hostSlot];
 		m_hostPeer = m_transport->connect(host.ip, host.port);
 		if (m_hostPeer == NO_PEER) {
-			push(Event(Event::CONNECT_FAILED));
-			return false;
+			m_reconnectAtMs = nowMs + CONNECT_RETRY_MS;
 		}
 	}
 	return true;
@@ -134,15 +136,35 @@ int Session::slotOfPeer(PeerId peer) const
 // ================================================================================================
 void Session::sendTo(int slot, int channel, const ByteWriter &w)
 {
-	if (slot >= 0 && slot < MAX_PLAYERS && m_remote[slot].connected && !m_remote[slot].left) {
+	if (slot < 0 || slot >= MAX_PLAYERS || m_remote[slot].left || !m_config.players[slot].human) {
+		return;
+	}
+	if (m_remote[slot].connected) {
 		m_transport->send(m_remote[slot].peer, channel, &w.data()[0], w.size());
+	} else if (channel != CHANNEL_FAST) {
+		Queued q;	// not connected yet: deliver when it is
+		q.channel = channel;
+		q.data = w.data();
+		m_queuedToSlot[slot].push_back(q);
 	}
 }
 
 void Session::sendToHost(int channel, const ByteWriter &w)
 {
-	if (m_hostPeer != NO_PEER) {
+	if (m_hostPeer != NO_PEER && m_welcomed) {
 		m_transport->send(m_hostPeer, channel, &w.data()[0], w.size());
+	} else if (channel != CHANNEL_FAST && !m_left) {
+		Queued q;	// not accepted yet: deliver when we are
+		q.channel = channel;
+		q.data = w.data();
+		m_queuedToHost.push_back(q);
+	}
+}
+
+void Session::sendHandshake(const ByteWriter &w)
+{
+	if (m_hostPeer != NO_PEER) {
+		m_transport->send(m_hostPeer, CHANNEL_GAME, &w.data()[0], w.size());
 	}
 }
 
@@ -181,7 +203,7 @@ void Session::update(uint32_t nowMs)
 					w.u32(m_config.iniCRC);
 					w.u32(m_lastReceived);
 					w.u32(m_lastTaken);
-					sendToHost(CHANNEL_GAME, w);
+					sendHandshake(w);
 					// and every command it may not have yet
 					if (!m_unacked.empty()) {
 						ByteWriter c;
@@ -202,7 +224,7 @@ void Session::update(uint32_t nowMs)
 					w.u8(m_config.localSlot);
 					w.u32(m_config.exeCRC);
 					w.u32(m_config.iniCRC);
-					sendToHost(CHANNEL_GAME, w);
+					sendHandshake(w);
 				}
 				break;
 
@@ -224,6 +246,8 @@ void Session::update(uint32_t nowMs)
 						// we left
 					} else if (m_started) {
 						startMigration(nowMs);		// the host, or the player we tried as new host, is gone
+					} else if (!m_welcomed && (int32_t)(nowMs - m_connectDeadlineMs) < 0) {
+						m_reconnectAtMs = nowMs + CONNECT_RETRY_MS;	// not there yet: try again
 					} else {
 						push(Event(m_welcomed ? Event::HOST_LOST : Event::CONNECT_FAILED));
 					}
@@ -236,6 +260,19 @@ void Session::update(uint32_t nowMs)
 
 			default:
 				break;
+		}
+	}
+
+	if (!isHost() && m_reconnectAtMs && (int32_t)(nowMs - m_reconnectAtMs) >= 0 && !m_left) {
+		m_reconnectAtMs = 0;
+		const PlayerAddress &host = m_config.players[m_config.hostSlot];
+		m_hostPeer = m_transport->connect(host.ip, host.port);
+		if (m_hostPeer == NO_PEER) {
+			if ((int32_t)(nowMs - m_connectDeadlineMs) < 0) {
+				m_reconnectAtMs = nowMs + CONNECT_RETRY_MS;
+			} else {
+				push(Event(Event::CONNECT_FAILED));
+			}
 		}
 	}
 
@@ -713,6 +750,11 @@ void Session::hostHello(PeerId peer, ByteReader &r)
 	rem.connected = true;
 	rem.helloReceived = true;
 	rem.lastFrame = m_config.firstFrame - 1;
+	for (size_t i = 0; i < m_queuedToSlot[slot].size(); ++i) {
+		const Queued &q = m_queuedToSlot[slot][i];
+		m_transport->send(peer, q.channel, &q.data[0], q.data.size());
+	}
+	m_queuedToSlot[slot].clear();
 	w.u8(MSG_WELCOME);
 	w.u8(slot);
 	m_transport->send(peer, CHANNEL_GAME, &w.data()[0], w.size());
@@ -1073,6 +1115,7 @@ void Session::hostPlayerGone(int slot, int reason)
 	}
 	rem.left = true;
 	rem.waitingSinceMs = 0;
+	m_queuedToSlot[slot].clear();
 	for (int i = 0; i < MAX_PLAYERS; ++i) {
 		m_remote[i].dropVotes[slot] = false;
 		rem.dropVotes[i] = false;
@@ -1297,6 +1340,11 @@ void Session::clientHandle(uint32_t type, ByteReader &r, uint32_t nowMs)
 	switch (type) {
 		case MSG_WELCOME:
 			m_welcomed = true;
+			m_migrating = false;		// (after a host change: the new host accepted us)
+			for (size_t i = 0; i < m_queuedToHost.size(); ++i) {
+				m_transport->send(m_hostPeer, m_queuedToHost[i].channel, &m_queuedToHost[i].data[0], m_queuedToHost[i].data.size());
+			}
+			m_queuedToHost.clear();
 			push(Event(Event::CONNECTED));
 			break;
 
@@ -1465,6 +1513,7 @@ void Session::startMigration(uint32_t nowMs)
 		m_migrationDeadlineMs = nowMs + MIGRATION_TIMEOUT_MS;
 	}
 	m_failedHost[m_config.hostSlot] = true;
+	m_welcomed = false;		// until the new host accepts us
 
 	// Everyone picks the same new host: the lowest slot still in the game.
 	int candidate = -1;
@@ -1559,6 +1608,28 @@ void Session::hostMigrationUpdate(uint32_t nowMs)
 	// Wait for every remaining player (or the timeout), then for the turns some of them have and
 	// we do not.  A turn the old host released must never be replaced by a different one.
 	const bool timedOut = (int32_t)(nowMs - m_migrationDeadlineMs) >= 0;
+	if (m_isolated) {
+		return;
+	}
+	if (timedOut) {
+		// Nobody reconnected although players were expected: most likely it is we who lost the
+		// network, not them.  Going on alone would split the game in two; give up instead.
+		int expected = 0, resumed = 0;
+		for (int i = 0; i < MAX_PLAYERS; ++i) {
+			if (i == m_config.localSlot || i == m_oldHost || !m_config.players[i].human || m_leftSeen[i]) {
+				continue;
+			}
+			++expected;
+			if (m_resumed[i]) {
+				++resumed;
+			}
+		}
+		if (expected > 0 && resumed == 0) {
+			m_isolated = true;
+			push(Event(Event::HOST_LOST));
+			return;
+		}
+	}
 	Frame newest = m_lastReceived;
 	for (int i = 0; i < MAX_PLAYERS; ++i) {
 		if (i == m_config.localSlot || i == m_oldHost || !m_config.players[i].human || m_leftSeen[i] || m_remote[i].left) {

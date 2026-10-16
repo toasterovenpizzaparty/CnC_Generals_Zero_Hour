@@ -45,6 +45,7 @@
 #include "GameNetwork/Lockstep/Session.h"
 
 #include <map>
+#include <set>
 #include <vector>
 
 #if defined(DEBUG_CRC)
@@ -75,7 +76,7 @@ std::vector<uint8_t> SerializeMessage(GameMessage *msg)
 	ByteWriter w;
 	w.u32((UnsignedInt)msg->getType());
 	Int count = msg->getArgumentCount();
-	w.u8((UnsignedInt)count);
+	w.u16((UnsignedInt)count);
 	for (Int i = 0; i < count; ++i) {
 		GameMessageArgumentDataType type = msg->getArgumentDataType(i);
 		const GameMessageArgumentType *arg = msg->getArgument(i);
@@ -113,7 +114,7 @@ GameMessage *DeserializeMessage(const std::vector<uint8_t> &data, Int slot)
 {
 	ByteReader r(data);
 	UnsignedInt type = r.u32();
-	UnsignedInt count = r.u8();
+	UnsignedInt count = r.u16();
 	const Player *player = PlayerOfSlot(slot);
 	if (!r.ok() || !player || type <= (UnsignedInt)GameMessage::MSG_BEGIN_NETWORK_MESSAGES ||
 		type >= (UnsignedInt)GameMessage::MSG_END_NETWORK_MESSAGES) {
@@ -279,6 +280,12 @@ private:
 	Int m_localSlot;
 	Status m_status;
 	Bool m_frameDataReady;
+	Bool m_loaded;					// our loading finished: frame 1 onwards needs turns
+	Int m_relayedFrame;				// the frame whose turn is on TheCommandList (-1 = none)
+	std::set<GameMessage *> m_relayed;	// messages relayTurn put on TheCommandList
+	UnsignedInt m_heldFrameMs;		// pacing while the logic holds a frame (script time freeze)
+	Int m_lastReportedCRCFrame;
+	Bool m_hostLost;				// the host is gone and nobody took over (shown once in game)
 	Bool m_sawCRCMismatch;
 	Bool m_screenOn;
 	Bool m_ownDisconnectMenu;
@@ -308,7 +315,8 @@ NetworkInterface *NetworkInterface::createNetwork()
 
 LockstepNetwork::LockstepNetwork()
 	: m_transport(NULL), m_session(NULL), m_localIP(0), m_localPort(NETWORK_BASE_PORT_NUMBER), m_localSlot(0),
-	m_status(STATUS_PREGAME), m_frameDataReady(FALSE), m_sawCRCMismatch(FALSE), m_screenOn(FALSE),
+	m_status(STATUS_PREGAME), m_frameDataReady(FALSE), m_loaded(FALSE), m_relayedFrame(-1), m_heldFrameMs(0),
+	m_lastReportedCRCFrame(-1), m_hostLost(FALSE), m_sawCRCMismatch(FALSE), m_screenOn(FALSE),
 	m_ownDisconnectMenu(FALSE), m_messageWindow(NULL), m_nextFileID(0), m_rateSampleMs(0),
 	m_rateBytesIn(0), m_ratePacketsIn(0), m_rateBytesOut(0), m_ratePacketsOut(0)
 {
@@ -327,6 +335,12 @@ void LockstepNetwork::init()
 	deinit();
 	m_status = STATUS_PREGAME;
 	m_frameDataReady = FALSE;
+	m_loaded = FALSE;
+	m_relayedFrame = -1;
+	m_relayed.clear();
+	m_heldFrameMs = 0;
+	m_lastReportedCRCFrame = -1;
+	m_hostLost = FALSE;
 	m_sawCRCMismatch = FALSE;
 	m_screenOn = FALSE;
 	m_nextFileID = 0;
@@ -346,6 +360,13 @@ void LockstepNetwork::init()
 void LockstepNetwork::deinit()
 {
 	if (m_session) {
+		if (m_status == STATUS_INGAME) {
+			// Torn down while still playing (not through the quit menu): our army leaves with us.
+			GameMessage *msg = newInstance(GameMessage)(GameMessage::MSG_SELF_DESTRUCT);
+			msg->appendBooleanArgument(TRUE);
+			m_session->submitCommand(SerializeMessage(msg));
+			msg->deleteInstance();
+		}
 		// Leaving: give our last messages (our self-destruct, our departure) a moment to arrive.
 		m_session->leave();
 		UnsignedInt start = timeGetTime();
@@ -423,8 +444,13 @@ void LockstepNetwork::update()
 		return;
 	}
 	const Lockstep::Frame frame = TheGameLogic->getFrame();
-	if (m_status == STATUS_PREGAME && frame >= 1) {
-		m_status = STATUS_INGAME;	// frame 0 has run: from now on every frame needs its turn
+	// Frame 0 runs as the game starts, after loading (startNewGame resets the frame counter, which
+	// in the menus may be anything).  From frame 1 on every frame needs its turn.
+	if (m_status == STATUS_PREGAME && m_loaded && frame >= 1) {
+		m_status = STATUS_INGAME;
+	}
+	if ((Int)frame != m_relayedFrame) {
+		m_relayed.clear();		// the logic ran that frame and reset TheCommandList
 	}
 
 	submitLocalCommands();
@@ -433,12 +459,29 @@ void LockstepNetwork::update()
 	if (m_status == STATUS_PREGAME) {
 		m_frameDataReady = TRUE;	// starting the game (loading runs inside the logic)
 	} else if (m_status == STATUS_INGAME) {
+		if (m_hostLost && !m_screenOn && TheDisconnectMenu) {
+			// The host left (or could not be reached) and nobody took over: the game cannot go on.
+			TheDisconnectMenu->showScreen();
+			TheDisconnectMenu->showPacketRouterTimeout();
+			TheDisconnectMenu->setPacketRouterTimeoutTime(0);
+			m_screenOn = TRUE;
+		}
 		if (m_session->isHost() && !m_session->gameStarted()) {
 			// The game started without everyone having loaded (the loading screen timed out).
 			m_session->forceStart();
 		}
-		if (m_session->readyForFrame(frame, timeGetTime())) {
+		UnsignedInt now = timeGetTime();
+		if ((Int)frame == m_relayedFrame) {
+			// The logic did not finish this frame (a script froze time): its commands are still on
+			// TheCommandList.  Let it try again at the normal pace, without a new turn.
+			if (now - m_heldFrameMs >= 1000 / getFrameRate()) {
+				m_heldFrameMs = now;
+				m_frameDataReady = TRUE;
+			}
+		} else if (m_session->readyForFrame(frame, now)) {
 			relayTurn(frame);
+			m_relayedFrame = (Int)frame;
+			m_heldFrameMs = now;
 			m_frameDataReady = TRUE;
 		}
 	}
@@ -459,11 +502,16 @@ void LockstepNetwork::submitLocalCommands()
 		GameMessage *next = msg->next();
 		GameMessage::Type type = msg->getType();
 
-		if (type == GameMessage::MSG_LOGIC_CRC) {
+		if (m_relayed.count(msg)) {
+			// Other players' commands from the turn, still here because the logic held the frame.
+		} else if (type == GameMessage::MSG_LOGIC_CRC) {
 			// Computed at the end of the previous frame.  The host compares everyone's; the message
-			// itself stays on the list for the replay recorder.
-			if (m_status == STATUS_INGAME && !msg->getArgument(1)->boolean) {
-				m_session->reportCRC(TheGameLogic->getFrame() - 1, (UnsignedInt)msg->getArgument(0)->integer);
+			// itself stays on the list for the replay recorder (and for several updates, so report
+			// each frame's CRC once).
+			Int crcFrame = (Int)TheGameLogic->getFrame() - 1;
+			if (m_status == STATUS_INGAME && !msg->getArgument(1)->boolean && crcFrame > m_lastReportedCRCFrame) {
+				m_lastReportedCRCFrame = crcFrame;
+				m_session->reportCRC((Lockstep::Frame)crcFrame, (UnsignedInt)msg->getArgument(0)->integer);
 			}
 		} else if (type > GameMessage::MSG_BEGIN_NETWORK_MESSAGES && type < GameMessage::MSG_END_NETWORK_MESSAGES) {
 			if (m_status == STATUS_INGAME) {
@@ -501,6 +549,7 @@ void LockstepNetwork::relayTurn(Lockstep::Frame frame)
 		GameMessage *msg = DeserializeMessage(turn.commands[i].data, turn.commands[i].slot);
 		if (msg) {
 			TheCommandList->appendMessage(msg);
+			m_relayed.insert(msg);
 		}
 	}
 	// Then the frame's events (after the commands, as the original DESTROYPLAYER).
@@ -542,6 +591,7 @@ void LockstepNetwork::playerLeft(Int slot, Int reason)
 			msg->appendBooleanArgument(FALSE);
 			msg->friend_setPlayerIndex(player->getPlayerIndex());
 			TheCommandList->appendMessage(msg);
+			m_relayed.insert(msg);
 		}
 		TheRecorder->logPlayerDisconnect(m_names[slot], slot);
 		TheInGameUI->message("Network:PlayerLeftGame", m_names[slot].str());
@@ -585,19 +635,21 @@ void LockstepNetwork::processEvents()
 				updateDisconnectScreen(e);
 				break;
 			case Lockstep::Event::HOST_LOST:
-				// Nobody can take over: the game cannot go on.  The disconnect screen offers to quit.
-				if (TheDisconnectMenu && m_status == STATUS_INGAME) {
-					TheDisconnectMenu->showScreen();
-					TheDisconnectMenu->showPacketRouterTimeout();
-					TheDisconnectMenu->setPacketRouterTimeoutTime(0);
-					m_screenOn = TRUE;
-				}
+				// Nobody can take over: the game cannot go on.  Shown (with the option to quit) as
+				// soon as we are in the game; during loading there is no screen for it.
+				m_hostLost = TRUE;
+				break;
+			case Lockstep::Event::GAME_START:
+				// Everyone has loaded, or the host started without a player that did not: either way
+				// the loading screen need not wait any longer.
+				TheGameLogic->timeOutGameStart();
 				break;
 			case Lockstep::Event::HOST_CHANGED:
 				DEBUG_LOG(("LockstepNetwork - slot %d is the host now\n", e.slot));
 				break;
 			case Lockstep::Event::CONNECT_FAILED:
 				DEBUG_LOG(("LockstepNetwork - could not join the game (reason %d)\n", e.value));
+				m_hostLost = TRUE;
 				break;
 			case Lockstep::Event::FILE_ANNOUNCE:
 			case Lockstep::Event::FILE_DATA:
@@ -668,6 +720,7 @@ void LockstepNetwork::updateLoadProgress(Int percent)
 
 void LockstepNetwork::loadProgressComplete()
 {
+	m_loaded = TRUE;
 	TheGameLogic->processProgressComplete(m_localSlot);
 	if (m_session) {
 		m_session->sendLoadComplete();
@@ -843,8 +896,13 @@ void LockstepNetwork::fileReceived(const Lockstep::Event &e)
 		f.size = (UnsignedInt)e.value;
 		f.received = 0;
 		f.sender = e.slot;
-		f.data.assign(f.size, 0);
 		f.written = FALSE;
+		const Bool recipient = (e.mask & (1 << m_localSlot)) != 0;
+		if (recipient) {
+			f.data.assign(f.size, 0);
+		} else {
+			f.written = TRUE;	// not for us: nothing to receive
+		}
 		m_fileIDByPath[f.realPath] = id;
 		std::vector<Int> &progress = m_fileProgress[id];
 		progress.assign(MAX_SLOTS, 100);
@@ -852,6 +910,16 @@ void LockstepNetwork::fileReceived(const Lockstep::Event &e)
 			if (e.mask & (1 << i)) {
 				progress[i] = 0;
 			}
+		}
+		if (recipient && f.size == 0) {
+			// an empty file has no data messages: complete it now
+			File *fp = TheFileSystem->openFile(f.realPath.str(), File::CREATE | File::BINARY | File::WRITE);
+			if (fp) {
+				fp->close();
+			}
+			f.written = TRUE;
+			progress[m_localSlot] = 100;
+			m_session->sendFileProgress(f.sender, id, 100);
 		}
 		return;
 	}
