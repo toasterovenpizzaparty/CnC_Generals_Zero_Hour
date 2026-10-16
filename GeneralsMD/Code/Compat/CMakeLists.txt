@@ -27,5 +27,7 @@ add_library(zh_gamespy_stub STATIC gamespy/gamespy_stub.cpp)
 target_include_directories(zh_gamespy_stub PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/gamespy)
 target_link_libraries(zh_gamespy_stub PRIVATE zh_options)
 
-# Placeholder for platform pieces still to be replaced.
-add_library(zh_platform_stubs INTERFACE)
+# BYTEmark benchmark (not in the source release)
+add_library(zh_benchmark STATIC benchmark/benchmark_stub.cpp)
+target_include_directories(zh_benchmark PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/benchmark)
+target_link_libraries(zh_benchmark PRIVATE zh_options)

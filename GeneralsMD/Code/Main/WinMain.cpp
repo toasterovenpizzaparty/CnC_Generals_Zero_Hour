@@ -780,7 +780,7 @@ void checkProtection(void)
 // strtrim ====================================================================
 /** Trim leading and trailing whitespace from a character string (in place). */
 //=============================================================================
-static char* strtrim(char* buffer)
+char* strtrim(char* buffer)
 {
 	if (buffer != NULL) {
 		//	Strip leading white space from the string.

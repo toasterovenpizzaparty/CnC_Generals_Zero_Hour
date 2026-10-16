@@ -93,6 +93,8 @@ class AlphaEdgeTextureClass;
 
 #define NUM_ALPHA_TILES 12
 
+class AlphaTerrainTextureClass;	// forward declaration (Visual C++ let 'friend class' introduce the name)
+class TerrainTextureClass;	// forward declaration (Visual C++ let 'friend class' introduce the name)
 class WorldHeightMap : public RefCountClass,
                        public WorldHeightMapInterfaceClass
 {

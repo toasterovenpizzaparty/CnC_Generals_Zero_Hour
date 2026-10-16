@@ -81,6 +81,8 @@ typedef enum {
 
 class BridgeInfo;
 /// The individual data for a bridge.
+enum BodyDamageType : int;	// defined in GameLogic/Damage.h
+
 class W3DBridge 
 {
 protected:

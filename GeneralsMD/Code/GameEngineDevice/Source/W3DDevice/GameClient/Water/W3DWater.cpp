@@ -44,7 +44,7 @@
 #include "scene.h"
 #include "dx8wrapper.h"
 #include "light.h"
-#include "d3dx8math.h"
+#include "d3dx8.h"
 #include "simplevec.h"
 #include "mesh.h"
 #include "matinfo.h"
@@ -64,6 +64,7 @@
 #include "W3DDevice/GameClient/W3DPoly.h"
 #include "W3DDevice/GameClient/W3DScene.h"
 #include "W3DDevice/GameClient/W3DCustomScene.h"
+#include <mmsystem.h>	// timeGetTime
 
 
 #ifdef _INTERNAL
@@ -1265,7 +1266,7 @@ void WaterRenderObjClass::update( void )
 				{
 
 					// only pay attention to mesh points that are in motion
-					if( BitTest( pData->status, WaterRenderObjClass::IN_MOTION ) )
+					if( BitIsSet( pData->status, WaterRenderObjClass::IN_MOTION ) )
 					{
 
 						// DAMPENING to slow the changes down

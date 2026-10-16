@@ -44,6 +44,7 @@
 //-----------------------------------------------------------------------------
 
 #include "W3DDevice/GameClient/HeightMap.h"
+#include <mmsystem.h>	// timeGetTime
 #include "W3DDevice/GameClient/W3DWaterTracks.h"
 #include "W3DDevice/GameClient/W3DShaderManager.h"
 #include "W3DDevice/GameClient/W3DShroud.h"
@@ -178,7 +179,7 @@ Int WaterTracksObj::freeWaterTracksResources(void)
 *	the specified texture.
  */
 //=============================================================================
-void WaterTracksObj::init( Real width, Real length, Vector2 &start, Vector2 &end, Char *texturename, Int waveTimeOffset)
+void WaterTracksObj::init( Real width, Real length, const Vector2 &start, const Vector2 &end, Char *texturename, Int waveTimeOffset)
 {	
 	freeWaterTracksResources();	//free old resources used by this track
 
@@ -250,7 +251,7 @@ void WaterTracksObj::init( Real width, Real length, Vector2 &start, Vector2 &end
 *	defines the maximum distance the wave will reach.
  */
 //=============================================================================
-void WaterTracksObj::init( Real width, Vector2 &start, Vector2 &end, Char *texturename)
+void WaterTracksObj::init( Real width, const Vector2 &start, const Vector2 &end, Char *texturename)
 {	
 	freeWaterTracksResources();	//free old resources used by this track
 	m_boundingSphere.Init(Vector3(0,0,0),400);
@@ -1102,7 +1103,7 @@ extern HWND ApplicationHWnd;
 //TODO: Fix editor so it actually draws the wave segment instead of line while editing
 //Could freeze all the water while editing?  Or keep setting elapsed time on current segment.
 //Have to make it so seamless merge of segments at final position.
-static void TestWaterUpdate(void)
+void TestWaterUpdate(void)
 {
 	static Int doInit=1;
 	static WaterTracksObj *track=NULL,*track2=NULL;

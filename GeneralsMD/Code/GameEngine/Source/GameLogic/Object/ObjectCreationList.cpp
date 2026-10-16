@@ -1035,7 +1035,7 @@ protected:
 			obj->goInvulnerable( m_invulnerableTime ); 
 		}
 
-		if( BitTest( m_disposition, INHERIT_VELOCITY ) && sourceObj )
+		if( BitIsSet( m_disposition, INHERIT_VELOCITY ) && sourceObj )
 		{
 			const PhysicsBehavior *sourcePhysics = sourceObj->getPhysics();
 			PhysicsBehavior *objectPhysics = obj->getPhysics();
@@ -1045,7 +1045,7 @@ protected:
 			}
 		}
 
-		if( BitTest( m_disposition, LIKE_EXISTING ) )
+		if( BitIsSet( m_disposition, LIKE_EXISTING ) )
 		{
 			if (mtx)
 				obj->setTransformMatrix(mtx);
@@ -1083,7 +1083,7 @@ protected:
 
 		}
 
-		if( BitTest( m_disposition, ON_GROUND_ALIGNED ) )
+		if( BitIsSet( m_disposition, ON_GROUND_ALIGNED ) )
 		{
 			chunkPos.z = 99999.0f;
 			PathfindLayerEnum layer = TheTerrainLogic->getHighestLayerForDestination(&chunkPos);
@@ -1096,7 +1096,7 @@ protected:
 			obj->setPosition(&chunkPos);
 		}
 
-		if( BitTest( m_disposition, SEND_IT_OUT ) )
+		if( BitIsSet( m_disposition, SEND_IT_OUT ) )
 		{
 			obj->setOrientation(GameLogicRandomValueReal(0.0f, 2 * PI));
 			chunkPos.z = TheTerrainLogic->getGroundHeight( chunkPos.x, chunkPos.y );
@@ -1123,7 +1123,7 @@ protected:
 			}
 		}
 
-		if( BitTest( m_disposition, SEND_IT_FLYING | SEND_IT_UP | RANDOM_FORCE ) )
+		if( BitIsSet( m_disposition, SEND_IT_FLYING | SEND_IT_UP | RANDOM_FORCE ) )
 		{
 			if (mtx)
 			{
@@ -1171,7 +1171,7 @@ protected:
 				DUMPREAL(pitch);
 
 				Coord3D force;
-				if( BitTest( m_disposition, SEND_IT_FLYING ) )
+				if( BitIsSet( m_disposition, SEND_IT_FLYING ) )
 				{
 					Real horizForce = 4.0f * m_dispositionIntensity;		// 2
 					Real vertForce = 3.0f * m_dispositionIntensity;		// 3
@@ -1182,7 +1182,7 @@ protected:
 					DUMPREAL(vertForce);
 					DUMPCOORD3D(&force);
 				}
-				else if (BitTest(m_disposition, SEND_IT_UP) )
+				else if (BitIsSet(m_disposition, SEND_IT_UP) )
 				{
 					Real horizForce = 2.0f * m_dispositionIntensity;
 					Real vertForce = 4.0f * m_dispositionIntensity;	
@@ -1219,7 +1219,7 @@ protected:
 
 			}
 		}
-		if( BitTest( m_disposition, WHIRLING ) )
+		if( BitIsSet( m_disposition, WHIRLING ) )
 		{
 			PhysicsBehavior* objUp = obj->getPhysics();
 			if (objUp)
@@ -1234,7 +1234,7 @@ protected:
 			}
 		}
 		
-		if( BitTest( m_disposition, FLOATING ) )
+		if( BitIsSet( m_disposition, FLOATING ) )
 		{
 			static NameKeyType key = NAMEKEY( "FloatUpdate" );
 			FloatUpdate *floatUpdate = (FloatUpdate *)obj->findUpdateModule( key );

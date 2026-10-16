@@ -178,7 +178,8 @@ inline Real deg2rad(Real rad) { return rad * (PI/180); }
 //-----------------------------------------------------------------------------
 // For twiddling bits
 //-----------------------------------------------------------------------------
-#define BitTest( x, i ) ( ( (x) & (i) ) != 0 )
+// (was BitTest, which clashes with the Windows SDK's BitTest -> _bittest macro)
+#define BitIsSet( x, i ) ( ( (x) & (i) ) != 0 )
 #define BitSet( x, i ) ( (x) |= (i) )
 #define BitClear( x, i ) ( (x ) &= ~(i) )
 #define BitToggle( x, i ) ( (x) ^= (i) )

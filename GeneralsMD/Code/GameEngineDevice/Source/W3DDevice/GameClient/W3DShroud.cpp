@@ -41,6 +41,7 @@
 #include "WW3D2/textureloader.h"
 #include "Common/GlobalData.h"
 #include "GameLogic/PartitionManager.h"
+#include <mmsystem.h>	// timeGetTime
 
 #ifdef _INTERNAL
 // for occasional debugging...

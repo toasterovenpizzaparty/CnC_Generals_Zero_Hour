@@ -80,6 +80,7 @@ protected:
 	** This class encapsulates the current state of a camera shaker.  It is a multi-list object
 	** and is allocated in pools.
 	*/
+public:	// (was protected: the memory pool definition, DEFINE_AUTO_POOL, names this type at namespace scope)
 	class CameraShakerClass : public MultiListObjectClass, public AutoPoolClass<CameraShakerClass,256>
 	{	
 	public:

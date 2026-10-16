@@ -155,9 +155,16 @@ template <size_t NUMBITS>
 	* Version Info:
 	* 1: Initial version */
 //-------------------------------------------------------------------------------------------------
+// Xfer.h includes this header (via ModelState.h) before class Xfer is defined.  Making the type
+// depend on the template parameter defers name lookup to instantiation, which is what Visual C++
+// did for every template; standard compilers check non-dependent names at the definition.
+template <class T, size_t N> struct BitFlagsDependentType { typedef T type; };
+
 template <size_t NUMBITS>
-void BitFlags<NUMBITS>::xfer(Xfer* xfer)
+void BitFlags<NUMBITS>::xfer(Xfer* xferArg)
 {
+	typename BitFlagsDependentType<Xfer, NUMBITS>::type *xfer = xferArg;
+
 	// this deserves a version number
 	XferVersion currentVersion = 1;
 	XferVersion version = currentVersion;

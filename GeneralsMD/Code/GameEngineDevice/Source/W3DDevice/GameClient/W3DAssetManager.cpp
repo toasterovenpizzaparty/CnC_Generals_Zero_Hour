@@ -440,7 +440,8 @@ static void remapTexture16Bit(Int dx, Int dy, Int pitch, SurfaceClass::SurfaceDe
 	Vector3 rgb,v_color((float)((color>>16)&0xff)/255.0f/255.0f,(float)((color>>8)&0xff)/255.0f/255.0f,(float)(color&0xff)/255.0f/255.0f);
 
 	//Generate a new color gradient palette based on reference color
-	for (Int y=0; y<TEAM_COLOR_PALETTE_SIZE; y++)
+	Int y;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (y=0; y<TEAM_COLOR_PALETTE_SIZE; y++)
 	{	
 		rgb.X=(Real)houseColorScale[y]*v_color.X;
 		rgb.Y=(Real)houseColorScale[y]*v_color.Y;
@@ -543,7 +544,8 @@ static void remapTexture32Bit(Int dx, Int dy, Int pitch, SurfaceClass::SurfaceDe
 	Vector3 rgb,v_color((float)((color>>16)&0xff)/255.0f/255.0f,(float)((color>>8)&0xff)/255.0f/255.0f,(float)(color&0xff)/255.0f/255.0f);
 
 	//Generate a new color gradient palette based on reference color
-	for (Int y=0; y<TEAM_COLOR_PALETTE_SIZE; y++)
+	Int y;	// hoisted: was visible after the loop under VC6 scoping rules
+	for (y=0; y<TEAM_COLOR_PALETTE_SIZE; y++)
 	{	
 		rgb.X=(Real)houseColorScale[y]*v_color.X;
 		rgb.Y=(Real)houseColorScale[y]*v_color.Y;

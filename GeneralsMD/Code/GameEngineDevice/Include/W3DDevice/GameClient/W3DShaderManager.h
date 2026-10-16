@@ -44,6 +44,9 @@ enum ChipsetType : int;
 enum CpuType : int;
 enum GraphicsVenderID : int;
 
+enum FilterTypes : int;	// defined in GameClient/CommandXlat.h
+enum FilterModes : int;
+
 class TextureClass;	///forward reference
 /** System for managing complex rendering settings which are either not handled by
 	WW3D2 or need custom paths depending on the video card.  This system will determine
