@@ -128,6 +128,23 @@ zh_library(compression SOURCES ${COMPRESSION_SOURCES}
     DEFINES Z_PREFIX LINK zh_zlib zh_lzhl)
 
 # ------------------------------------------------------------------------------------------------
+# LAN network: ENet and the lockstep session (engine-independent, see GameNetwork/Lockstep)
+# ------------------------------------------------------------------------------------------------
+file(GLOB ENET_SOURCES ${ZH_CODE}/Libraries/Source/ENet/*.c)
+add_library(zh_enet STATIC ${ENET_SOURCES})
+target_include_directories(zh_enet PUBLIC ${ZH_CODE}/Libraries/Source/ENet/include)
+target_link_libraries(zh_enet PRIVATE zh_options)
+if(WIN32)
+    target_link_libraries(zh_enet PUBLIC ws2_32 winmm)
+endif()
+
+add_library(zh_lockstep STATIC
+    ${ZH_CODE}/GameEngine/Source/GameNetwork/Lockstep/Session.cpp
+    ${ZH_CODE}/GameEngine/Source/GameNetwork/Lockstep/EnetTransport.cpp)
+target_include_directories(zh_lockstep PUBLIC ${ZH_CODE}/GameEngine/Include)
+target_link_libraries(zh_lockstep PUBLIC zh_enet PRIVATE zh_options)
+
+# ------------------------------------------------------------------------------------------------
 # Game engine
 # ------------------------------------------------------------------------------------------------
 zh_library(gameengine SOURCES ${GAMEENGINE_SOURCES}
