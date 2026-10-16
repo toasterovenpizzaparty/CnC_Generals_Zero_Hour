@@ -354,8 +354,10 @@ struct Player
 	bool corrupt;				// simulate a desync: this player's simulation differs
 	std::vector<std::pair<Frame, int> > leftEvents;	// (frame, slot)
 	uint32_t seqCounter;
+	int newHost;			// from HOST_CHANGED (-1 = none)
+	bool hostLost;
 
-	Player() : slot(0), nextFrame(1), hash(1469598103934665603ull), frozenMs(0), starvedMs(0), longestFreezeMs(0), freezeStart(-1),
+	Player() : newHost(-1), hostLost(false), slot(0), nextFrame(1), hash(1469598103934665603ull), frozenMs(0), starvedMs(0), longestFreezeMs(0), freezeStart(-1),
 		left(false), crashed(false), desyncSeen(false), desyncFrame(0), updateIntervalMs(5), nextUpdate(0),
 		corrupt(false), seqCounter(0) {}
 };
@@ -434,7 +436,10 @@ static GameResult RunSimulatedGame(const GameSetup &setup, std::vector<Player> *
 			p.session->update(ms);
 
 			Event e;
-			while (p.session->pollEvent(e)) {}
+			while (p.session->pollEvent(e)) {
+				if (e.type == Event::HOST_CHANGED) p.newHost = e.slot;
+				if (e.type == Event::HOST_LOST) p.hostLost = true;
+			}
 
 			// load instantly once connected (after 200 ms)
 			if (!loadedSent && net.now >= 200) {
@@ -664,6 +669,46 @@ static void TestCrash()
 	CHECK(r.framesPlayed > 40 * 30 * 0.85, "then continued (%d frames)", r.framesPlayed);
 }
 
+static void TestHostChange(bool crash)
+{
+	printf(crash ? "The host's computer dies after 20 s (4 players, two on Wi-Fi)\n"
+	             : "The host quits after 20 s (4 players, two on Wi-Fi)\n");
+	GameSetup s;
+	s.players = 4;
+	s.seconds = 50;
+	s.links[2] = GOOD_WIFI;
+	s.links[3] = BUSY_WIFI;
+	s.commandsPerSecond = 4;
+	if (crash) { s.crashSlot = 0; s.crashAtMs = 20000; }
+	else { s.leaveSlot = 0; s.leaveAtMs = 20000; }
+	s.seed = crash ? 71 : 72;
+	std::vector<Player> players;
+	GameResult r = RunSimulatedGame(s, &players);
+	CHECK(r.identical && r.exactlyOnce, "remaining players identical, every command executed exactly once");
+	bool newHost = players[1].newHost == 1 && players[2].newHost == 1 && players[3].newHost == 1;
+	CHECK(newHost, "everyone moved to the same new host (slot 1)");
+	bool lostNone = !players[1].hostLost && !players[2].hostLost && !players[3].hostLost;
+	CHECK(lostNone, "nobody lost the game");
+	bool same = !players[1].leftEvents.empty() && players[1].leftEvents == players[2].leftEvents &&
+		players[2].leftEvents == players[3].leftEvents && players[1].leftEvents[0].second == 0;
+	CHECK(same, "everyone saw the old host leave on the same frame (%u)", players[1].leftEvents.empty() ? 0 : players[1].leftEvents[0].first);
+	if (!crash) {
+		// The host's commands issued before it left reached everyone (e.g. its self-destruct).
+		bool all = true;
+		for (std::map<uint32_t, double>::const_iterator it = players[0].issuedAtMs.begin(); it != players[0].issuedAtMs.end(); ++it)
+			if (!players[1].executed.count(std::make_pair(0, it->first))) all = false;
+		CHECK(all, "every command the host issued before quitting was executed by the others");
+	}
+	printf("       frames played %d, longest freeze %.0f ms\n", r.framesPlayed, r.longestFreezeMs);
+	if (getenv("LOCKSTEP_DETAIL"))
+		for (int i = 0; i < 4; ++i) {
+			SessionStats st = players[i].session->stats();
+			printf("      player %d: next frame %u, buffered %d, host? %d\n", i, players[i].nextFrame, st.bufferedTurns,
+				players[i].session->isHost());
+		}
+	CHECK(r.framesPlayed > 50 * 30 * 0.85, "the game went on (%d frames)", r.framesPlayed);
+}
+
 static void TestSlowComputer()
 {
 	printf("One computer runs its game loop only 25 times per second (needs 30)\n");
@@ -847,6 +892,8 @@ int main()
 	TestEightPlayers();
 	TestLeave();
 	TestCrash();
+	TestHostChange(false);
+	TestHostChange(true);
 	TestSlowComputer();
 	TestDesync();
 	TestRealEnet();

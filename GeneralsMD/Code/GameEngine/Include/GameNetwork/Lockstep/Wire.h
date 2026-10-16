@@ -44,6 +44,9 @@ enum MessageType
 	MSG_VOTE,				// client -> host: vote to drop a player
 	MSG_TURN_BUNDLE,		// host -> all, unreliable: the latest turns again (covers a lost packet)
 	MSG_COMMAND_BUNDLE,		// client -> host, unreliable: commands not yet seen in a turn
+	// host change
+	MSG_RESUME,				// client -> new host: like HELLO, plus the last turn received and executed
+	MSG_TURN_REQUEST,		// new host -> client: send me your turns from this frame on
 	// bulk channel
 	MSG_CHAT,				// any -> host -> recipients
 	MSG_FILE_ANNOUNCE,		// sender -> host -> recipients: a file transfer begins

@@ -34,6 +34,15 @@ Session::Session(Transport *transport, const SessionConfig &config)
 	m_hostWaitingMs = 0;
 	m_lastBundleMs = 0;
 	m_lastStarveMs = 0;
+	m_migrating = false;
+	m_migrationDeadlineMs = 0;
+	m_oldHost = -1;
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		m_leftSeen[i] = false;
+		m_failedHost[i] = false;
+		m_resumed[i] = false;
+		m_resumeReceived[i] = 0;
+	}
 	m_cushionCurrent = 1000;
 	m_cushionPrevious = 1000;
 	m_cushionBucketMs = 0;
@@ -158,7 +167,31 @@ void Session::update(uint32_t nowMs)
 	while (m_transport->poll(e)) {
 		switch (e.type) {
 			case TransportEvent::CONNECTED:
-				if (!isHost() && e.peer == m_hostPeer) {
+				if (!isHost() && e.peer == m_hostPeer && m_started) {
+					// Reconnecting to a new host.
+					ByteWriter w;
+					w.u8(MSG_RESUME);
+					w.u32(PROTOCOL_MAGIC);
+					w.u16(PROTOCOL_VERSION);
+					w.u32(m_config.sessionId);
+					w.u8(m_config.localSlot);
+					w.u32(m_config.exeCRC);
+					w.u32(m_config.iniCRC);
+					w.u32(m_lastReceived);
+					w.u32(m_lastTaken);
+					sendToHost(CHANNEL_GAME, w);
+					// and every command it may not have yet
+					if (!m_unacked.empty()) {
+						ByteWriter c;
+						c.u8(MSG_COMMANDS);
+						c.u16((uint32_t)m_unacked.size());
+						for (size_t i = 0; i < m_unacked.size(); ++i) {
+							c.u32(m_unacked[i].seq);
+							c.blob(m_unacked[i].data);
+						}
+						sendToHost(CHANNEL_GAME, c);
+					}
+				} else if (!isHost() && e.peer == m_hostPeer) {
 					ByteWriter w;
 					w.u8(MSG_HELLO);
 					w.u32(PROTOCOL_MAGIC);
@@ -185,7 +218,11 @@ void Session::update(uint32_t nowMs)
 					}
 				} else if (e.peer == m_hostPeer) {
 					m_hostPeer = NO_PEER;
-					if (!m_left) {
+					if (m_left) {
+						// we left
+					} else if (m_started) {
+						startMigration(nowMs);		// the host, or the player we tried as new host, is gone
+					} else {
 						push(Event(m_welcomed ? Event::HOST_LOST : Event::CONNECT_FAILED));
 					}
 				}
@@ -201,7 +238,9 @@ void Session::update(uint32_t nowMs)
 	}
 
 	if (isHost()) {
-		if (m_started && !m_left) {
+		if (m_migrating) {
+			hostMigrationUpdate(nowMs);
+		} else if (m_started && !m_left) {
 			hostUpdateInputDelay(nowMs);
 			hostUpdateWaiting(nowMs);
 		}
@@ -296,10 +335,10 @@ void Session::submitCommand(const std::vector<uint8_t> &data)
 	c.slot = (uint8_t)m_config.localSlot;
 	c.seq = m_nextSeq++;
 	c.data = data;
-	if (isHost()) {
+	if (isHost() && !m_migrating) {
 		m_pending.push_back(c);
 	} else {
-		m_outgoing.push_back(c);
+		m_outgoing.push_back(c);	// (a new host still taking over adds them, in order, when done)
 	}
 }
 
@@ -379,7 +418,7 @@ bool Session::takeTurn(Frame f, Turn &turn)
 		m_history.pop_front();
 	}
 
-	if (isHost()) {
+	if (isHost() && !m_migrating) {
 		// Executing frame f releases the turn D frames ahead (several if D just grew).
 		for (Frame r = m_lastReceived + 1; r <= f + (Frame)m_inputDelay; ++r) {
 			hostRelease(r);
@@ -426,7 +465,17 @@ void Session::leave()
 	}
 	m_left = true;
 	if (isHost()) {
-		// Tell the clients; they lose the game's host.
+		if (m_started && !m_migrating) {
+			// A last turn with our pending commands (e.g. our self-destruct) and our departure; then
+			// the clients pick a new host, which continues after it.
+			TurnEvent ev;
+			ev.type = EVENT_PLAYER_LEFT;
+			ev.slot = (uint8_t)m_config.localSlot;
+			ev.reason = LEAVE_QUIT;
+			ev.frame = 0;
+			m_pendingEvents.push_back(ev);
+			hostRelease(m_lastReceived + 1);
+		}
 		for (int i = 0; i < MAX_PLAYERS; ++i) {
 			if (m_remote[i].connected) {
 				m_transport->disconnect(m_remote[i].peer);
@@ -582,6 +631,8 @@ void Session::handleMessage(PeerId peer, int, const std::vector<uint8_t> &data, 
 		int slot = slotOfPeer(peer);
 		if (type == MSG_HELLO) {
 			hostHello(peer, r);
+		} else if (type == MSG_RESUME) {
+			hostResume(peer, r);
 		} else if (slot >= 0) {
 			hostHandle(slot, type, r, nowMs);
 		}
@@ -679,7 +730,17 @@ void Session::hostHandle(int slot, uint32_t type, ByteReader &r, uint32_t nowMs)
 			for (uint32_t i = 0; i < n && r.ok(); ++i) {
 				uint32_t seq = r.u32();
 				std::vector<uint8_t> data = r.blob();
-				if (r.ok()) {
+				if (!r.ok()) {
+					break;
+				}
+				if (m_migrating) {
+					// Taking over: which commands are new is known once all turns are collected.
+					Command c;
+					c.slot = (uint8_t)slot;
+					c.seq = seq;
+					c.data = data;
+					m_migrationCommands.push_back(c);
+				} else {
 					hostAcceptCommand(slot, seq, data);
 				}
 			}
@@ -939,6 +1000,11 @@ void Session::clientSendCommands(uint32_t nowMs)
 
 void Session::storeTurn(const Turn &t)
 {
+	for (size_t i = 0; i < t.events.size(); ++i) {
+		if (t.events[i].type == EVENT_PLAYER_LEFT && t.events[i].slot < MAX_PLAYERS) {
+			m_leftSeen[t.events[i].slot] = true;
+		}
+	}
 	if (!isHost() && t.frame >= m_lastReceived && t.inputDelay >= MIN_INPUT_DELAY && t.inputDelay <= MAX_INPUT_DELAY) {
 		// Clients keep the host's input delay worth of turns in hand: that is the slack that rides
 		// out a late packet, so they only run faster when they hold more than that.
@@ -1235,6 +1301,21 @@ void Session::clientHandle(uint32_t type, ByteReader &r, uint32_t nowMs)
 			break;
 		}
 
+		case MSG_TURN_REQUEST: {
+			// A new host collects the turns it lacks.
+			Frame from = r.u32();
+			if (!r.ok()) return;
+			for (Frame f = from; f <= m_lastReceived; ++f) {
+				Turn t;
+				if (findTurn(f, t)) {
+					ByteWriter w;
+					encodeTurn(w, t);
+					sendToHost(CHANNEL_GAME, w);
+				}
+			}
+			break;
+		}
+
 		case MSG_TURN_BUNDLE: {
 			uint32_t n = r.u8();
 			for (uint32_t i = 0; i < n; ++i) {
@@ -1334,6 +1415,220 @@ void Session::clientUpdateWaiting(uint32_t nowMs)
 		e.waitingMs[m_config.hostSlot] = ms;
 		push(e);
 	}
+}
+
+// ================================================================================================
+// Host change
+// ================================================================================================
+void Session::startMigration(uint32_t nowMs)
+{
+	if (!m_migrating) {
+		m_migrating = true;
+		m_oldHost = m_config.hostSlot;
+		m_migrationDeadlineMs = nowMs + MIGRATION_TIMEOUT_MS;
+	}
+	m_failedHost[m_config.hostSlot] = true;
+
+	// Everyone picks the same new host: the lowest slot still in the game.
+	int candidate = -1;
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		if (m_config.players[i].human && !m_failedHost[i] && !m_leftSeen[i]) {
+			candidate = i;
+			break;
+		}
+	}
+	if (candidate < 0) {
+		push(Event(Event::HOST_LOST));
+		return;
+	}
+	m_config.hostSlot = candidate;
+	Event e(Event::HOST_CHANGED);
+	e.slot = candidate;
+	push(e);
+
+	if (candidate == m_config.localSlot) {
+		becomeHost(nowMs);
+	} else {
+		const PlayerAddress &host = m_config.players[candidate];
+		m_hostPeer = m_transport->connect(host.ip, host.port);
+		if (m_hostPeer == NO_PEER) {
+			startMigration(nowMs);	// try the next one
+		}
+	}
+}
+
+void Session::becomeHost(uint32_t nowMs)
+{
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		m_remote[i] = Remote();
+		m_resumed[i] = false;
+		m_resumeReceived[i] = 0;
+	}
+	m_migrationDeadlineMs = nowMs + MIGRATION_TIMEOUT_MS;
+	m_pending.clear();
+	m_pendingEvents.clear();
+	m_crcs.clear();
+	m_recentTurns.clear();
+	m_unsentCRCs.clear();
+	m_hostPeer = NO_PEER;
+}
+
+void Session::hostResume(PeerId peer, ByteReader &r)
+{
+	uint32_t magic = r.u32();
+	uint32_t version = r.u16();
+	uint32_t session = r.u32();
+	uint32_t slot = r.u8();
+	uint32_t exeCRC = r.u32();
+	uint32_t iniCRC = r.u32();
+	Frame received = r.u32();
+	Frame taken = r.u32();
+
+	if (!r.ok() || magic != PROTOCOL_MAGIC || version != PROTOCOL_VERSION || session != m_config.sessionId ||
+		slot >= MAX_PLAYERS || (int)slot == m_config.localSlot || !m_config.players[slot].human ||
+		m_remote[slot].connected || m_remote[slot].left || exeCRC != m_config.exeCRC || iniCRC != m_config.iniCRC) {
+		ByteWriter w;
+		w.u8(MSG_REJECT);
+		w.u8(REJECT_SLOT);
+		m_transport->send(peer, CHANNEL_GAME, &w.data()[0], w.size());
+		m_transport->disconnect(peer);
+		return;
+	}
+
+	Remote &rem = m_remote[slot];
+	rem.peer = peer;
+	rem.connected = true;
+	rem.helloReceived = true;
+	rem.loaded = true;
+	rem.lastFrame = taken;
+	m_resumed[slot] = true;
+	m_resumeReceived[slot] = received;
+
+	ByteWriter w;
+	w.u8(MSG_WELCOME);
+	w.u8(slot);
+	m_transport->send(peer, CHANNEL_GAME, &w.data()[0], w.size());
+
+	if (received > m_lastReceived) {
+		ByteWriter q;
+		q.u8(MSG_TURN_REQUEST);
+		q.u32(m_lastReceived + 1);
+		m_transport->send(peer, CHANNEL_GAME, &q.data()[0], q.size());
+	}
+}
+
+void Session::hostMigrationUpdate(uint32_t nowMs)
+{
+	// Wait for every remaining player (or the timeout), then for the turns some of them have and
+	// we do not.  A turn the old host released must never be replaced by a different one.
+	const bool timedOut = (int32_t)(nowMs - m_migrationDeadlineMs) >= 0;
+	Frame newest = m_lastReceived;
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		if (i == m_config.localSlot || i == m_oldHost || !m_config.players[i].human || m_leftSeen[i] || m_remote[i].left) {
+			continue;
+		}
+		if (!m_resumed[i]) {
+			if (!timedOut) {
+				return;
+			}
+			hostPlayerGone(i, LEAVE_DISCONNECTED);
+			continue;
+		}
+		newest = std::max(newest, m_resumeReceived[i]);
+	}
+	if (m_lastReceived < newest) {
+		if ((int32_t)(nowMs - m_migrationDeadlineMs) < (int32_t)MIGRATION_TIMEOUT_MS) {
+			return;		// the requested turns are on their way
+		}
+		// Whoever has turns we cannot get would diverge: they leave the game.
+		for (int i = 0; i < MAX_PLAYERS; ++i) {
+			if (m_resumed[i] && !m_remote[i].left && m_resumeReceived[i] > m_lastReceived) {
+				hostPlayerGone(i, LEAVE_DISCONNECTED);
+				m_transport->disconnect(m_remote[i].peer);
+			}
+		}
+	}
+
+	// Taking over is complete.
+	m_migrating = false;
+	if (m_oldHost >= 0 && !m_leftSeen[m_oldHost]) {
+		hostPlayerGone(m_oldHost, LEAVE_DISCONNECTED);
+	}
+
+	// Next command expected from each player: after the last one in any turn.
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		m_nextSeqFrom[i] = 1;
+		m_early[i].clear();
+	}
+	for (Frame f = m_config.firstFrame; f <= m_lastReceived; ++f) {
+		Turn t;
+		if (!findTurn(f, t)) {
+			continue;
+		}
+		for (size_t c = 0; c < t.commands.size(); ++c) {
+			uint8_t s = t.commands[c].slot;
+			if (s < MAX_PLAYERS && t.commands[c].seq >= m_nextSeqFrom[s]) {
+				m_nextSeqFrom[s] = t.commands[c].seq + 1;
+			}
+		}
+	}
+
+	// Give everyone the turns they missed.
+	for (int i = 0; i < MAX_PLAYERS; ++i) {
+		if (!m_resumed[i] || m_remote[i].left) {
+			continue;
+		}
+		for (Frame f = m_resumeReceived[i] + 1; f <= m_lastReceived; ++f) {
+			Turn t;
+			if (findTurn(f, t)) {
+				sendTurn(i, t);
+			}
+		}
+	}
+
+	// Commands that are not in any turn yet: the players' and our own.
+	std::vector<Command> commands;
+	commands.swap(m_migrationCommands);
+	commands.insert(commands.end(), m_unacked.begin(), m_unacked.end());
+	commands.insert(commands.end(), m_outgoing.begin(), m_outgoing.end());
+	m_unacked.clear();
+	m_outgoing.clear();
+	for (size_t i = 0; i < commands.size(); ++i) {
+		hostAcceptCommand(commands[i].slot, commands[i].seq, commands[i].data);
+	}
+	m_lastDelayUpdateMs = nowMs;
+
+	// Turns are released when frames execute; the old host may have stopped right after the last
+	// frame we executed, so release up to D frames ahead of us now (the first one says it left).
+	for (Frame r = m_lastReceived + 1; r <= m_lastTaken + (Frame)m_inputDelay; ++r) {
+		hostRelease(r);
+	}
+}
+
+bool Session::findTurn(Frame f, Turn &turn) const
+{
+	std::map<Frame, Turn>::const_iterator it = m_turns.find(f);
+	if (it != m_turns.end()) {
+		turn = it->second;
+		return true;
+	}
+	for (std::deque<Turn>::const_reverse_iterator h = m_history.rbegin(); h != m_history.rend(); ++h) {
+		if (h->frame == f) {
+			turn = *h;
+			return true;
+		}
+		if (h->frame < f) {
+			break;
+		}
+	}
+	return false;
+}
+
+void Session::sendTurn(int slot, const Turn &turn)
+{
+	ByteWriter w;
+	encodeTurn(w, turn);
+	sendTo(slot, CHANNEL_GAME, w);
 }
 
 // ================================================================================================

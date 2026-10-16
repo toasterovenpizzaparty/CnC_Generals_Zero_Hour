@@ -18,6 +18,9 @@
 //     limit, wait (the disconnect screen).
 //   * Machines report state CRCs to the host, which compares them and announces a mismatch in a
 //     turn, so everyone reacts on the same frame.
+//   * When the host leaves or its connection is lost, the remaining player with the lowest slot
+//     takes over: the others reconnect to it and report the last turn they have; it collects any
+//     turns it lacks, fills in everyone's gaps, announces that the old host left and goes on.
 //
 // The class knows nothing about the game: commands are opaque bytes.  LockstepNetwork connects it
 // to the engine.  Time comes from the caller (milliseconds), which makes it testable.
@@ -50,6 +53,7 @@ enum
 	INPUT_DELAY_CALM_MS = 10000,	// ...and only when no client ran out of turns for this long
 	CUSHION_BUCKET_MS = 500,		// clients report their smallest cushion over the last 0.5-1 s
 	STATUS_MIN_INTERVAL_MS = 100,	// clients report at least this often, even when not advancing
+	MIGRATION_TIMEOUT_MS = 5000,	// a new host waits this long for the other players to reconnect
 	LAG_SLOW_FRAMES = 4,			// a client this far behind (beyond the input delay) slows the host by 20%
 	LAG_SLOWER_FRAMES = 12,			// ... this far: 50%
 	LAG_STOP_FRAMES = 30,			// ... this far: the host waits for it
@@ -121,7 +125,8 @@ struct Event
 		GAME_START,			// everyone has loaded
 		CHAT,				// slot = sender, mask, text
 		WAITING,			// waitingMs[] = how long the game has waited for each slot (0 = not waiting)
-		HOST_LOST,			// client: the host is gone
+		HOST_LOST,			// client: the host is gone and nobody can take over (the game is over)
+		HOST_CHANGED,		// slot = the new host (it may be this machine)
 		PLAYER_LOST,		// a player's connection dropped (the PLAYER_LEFT turn event follows)
 		FILE_ANNOUNCE,		// slot = sender, id, name, value = total size, mask = recipients
 		FILE_DATA,			// slot = sender, id, value = offset, data
@@ -245,6 +250,14 @@ private:
 
 	// client
 	void clientHandle(uint32_t type, ByteReader &r, uint32_t nowMs);
+
+	// host change
+	void startMigration(uint32_t nowMs);
+	void becomeHost(uint32_t nowMs);
+	void hostResume(PeerId peer, ByteReader &r);
+	void hostMigrationUpdate(uint32_t nowMs);
+	bool findTurn(Frame f, Turn &turn) const;
+	void sendTurn(int slot, const Turn &turn);
 	void clientUpdateWaiting(uint32_t nowMs);
 
 	static void encodeTurn(ByteWriter &w, const Turn &t);		// with the MSG_TURN byte
@@ -315,6 +328,16 @@ private:
 	uint32_t m_lastStatusSentMs;
 	void noteCushion(int cushion);
 	uint32_t m_lastWaitingBroadcastMs;
+
+	// host change
+	bool m_migrating;					// client: looking for the new host; host: waiting for the players
+	uint32_t m_migrationDeadlineMs;
+	int m_oldHost;
+	bool m_leftSeen[MAX_PLAYERS];		// left according to the turns received so far
+	bool m_failedHost[MAX_PLAYERS];		// tried as host and gone
+	bool m_resumed[MAX_PLAYERS];		// new host: reconnected
+	Frame m_resumeReceived[MAX_PLAYERS];
+	std::vector<Command> m_migrationCommands;	// new host: commands received before taking over completed
 
 	std::deque<Event> m_events;
 };
