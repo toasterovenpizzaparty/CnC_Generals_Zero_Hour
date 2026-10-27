@@ -1,0 +1,96 @@
+name: Windows scripts
+
+# Tests build.cmd and the player installer on a real Windows machine.
+on:
+  push:
+    paths: ['build.cmd', 'scripts/**', '.github/workflows/windows-scripts.yml']
+  pull_request:
+    paths: ['build.cmd', 'scripts/**', '.github/workflows/windows-scripts.yml']
+  workflow_dispatch:
+
+env:
+  ZH_NO_PAUSE: 1
+
+jobs:
+  # Installs into a fake EA App installation of the Ultimate Collection and uninstalls again.
+  installer:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fake game installation and release folder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $collection = "$env:ProgramFiles\EA Games\Command & Conquer The Ultimate Collection"
+          $zh = "$collection\Command and Conquer Generals Zero Hour"
+          $generals = "$collection\Command and Conquer Generals"
+          New-Item -ItemType Directory -Force $zh, $generals | Out-Null
+          Set-Content "$zh\W3DZH.big" 'zero hour data'
+          Set-Content "$zh\game.dat" 'original game'
+          Set-Content "$generals\INI.big" 'generals data'
+          "ZH=$zh" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          "ORIGINALS=$((Get-ChildItem $zh | Get-FileHash | ForEach-Object Hash) -join ',')" | Out-File -Append -Encoding ascii $env:GITHUB_ENV
+          # Any executable will do as the "game".
+          Copy-Item "$env:WINDIR\System32\whoami.exe" fake.exe
+
+      - name: Package like a release
+        shell: bash
+        run: scripts/package-release.sh fake.exe "release dir" v0.0-test $(git rev-parse --short HEAD)
+
+      - name: Install
+        shell: powershell
+        run: |
+          # -ForceDirectX: install the DirectX runtime even if the runner has it.
+          # -ForceRelaunch: run the administrator part in a second, elevated copy as on a player's PC.
+          & "release dir\Install.cmd" -Unattended -ForceDirectX -ForceRelaunch
+          if ($LASTEXITCODE -ne 0) { throw "Install.cmd failed: $LASTEXITCODE" }
+
+      - name: Check the installation
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = "$env:ZH\generalszh.exe"
+          if ((Get-FileHash $exe).Hash -ne (Get-FileHash fake.exe).Hash) { throw 'exe not installed' }
+          if (-not (Get-NetFirewallRule -Group 'Zero Hour (LAN)' -ErrorAction SilentlyContinue)) { throw 'no firewall rule' }
+          if (-not (Test-Path "$env:WINDIR\SysWOW64\d3dx9_43.dll")) { throw 'no d3dx9_43.dll' }
+          $link = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Zero Hour (LAN).lnk'
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($link).TargetPath
+          if ($target -ne $exe) { throw "shortcut points to '$target'" }
+          $key = [Microsoft.Win32.RegistryKey]::OpenBaseKey('CurrentUser', 'Registry32').OpenSubKey('SOFTWARE\Electronic Arts\EA Games\Generals')
+          if (-not $key -or -not $key.GetValue('InstallPath').StartsWith("$env:ProgramFiles\EA Games")) { throw 'Generals InstallPath not set' }
+          $originals = (Get-ChildItem $env:ZH -Exclude generalszh.exe | Get-FileHash | ForEach-Object Hash) -join ','
+          if ($originals -ne $env:ORIGINALS) { throw 'game files changed' }
+          'installation OK'
+
+      - name: Uninstall
+        shell: powershell
+        run: |
+          & "release dir\Uninstall.cmd" -Unattended -ForceRelaunch
+          if ($LASTEXITCODE -ne 0) { throw "Uninstall.cmd failed: $LASTEXITCODE" }
+          if (Test-Path "$env:ZH\generalszh.exe") { throw 'exe still there' }
+          if (Get-NetFirewallRule -Group 'Zero Hour (LAN)' -ErrorAction SilentlyContinue) { throw 'firewall rule still there' }
+          if (Test-Path (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Zero Hour (LAN).lnk')) { throw 'shortcut still there' }
+          $originals = (Get-ChildItem $env:ZH | Get-FileHash | ForEach-Object Hash) -join ','
+          if ($originals -ne $env:ORIGINALS) { throw 'game files changed' }
+          'uninstall OK'
+
+  # build.cmd from a fresh checkout: downloads its tools and builds the game.
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build.cmd
+        shell: cmd
+        run: build.cmd
+
+      - name: build.cmd again (tools already there, nothing to rebuild)
+        shell: cmd
+        run: build.cmd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generalszh-win32-native-build
+          path: build/win32/dist/generalszh.exe

@@ -6,19 +6,57 @@ Windows executable that runs with the data of an installed Zero Hour 1.04.
 
 The multiplayer fixes are described in [NETWORK_AND_DETERMINISM.md](NETWORK_AND_DETERMINISM.md).
 
-## Getting the executable
+## For players: installing a release
 
-Every push builds it on GitHub Actions. To download it, open the **Actions** tab, click the latest
-run of **Build**, and download the `generalszh-win32` artifact.
+A release is a zip file, `ZeroHour-LAN-<version>.zip`, with `generalszh.exe`, `Install.cmd`,
+`Uninstall.cmd` and a README. Extract it and double-click `Install.cmd`. The installer:
 
-To try it, copy `generalszh.exe` into your Zero Hour installation folder: the folder that contains
-`game.dat` and the `.big` files. Start it from there and keep the original files. For LAN games,
-every player must run the same `generalszh.exe`, because the game refuses players whose executable
-differs.
+- finds the Zero Hour folder: EA App / Origin / retail installs, through the registry and the usual
+  install folders. If it finds nothing it asks for the folder; if it finds several it asks which one,
+- checks the exe against `SHA256SUMS.txt` and copies it next to `game.dat`. The game's own files are
+  never changed,
+- adds a Windows Firewall rule for the exe (UDP, local network only, any network profile),
+- installs Microsoft's DirectX 9 runtime if `d3dx9_43.dll` is missing. It downloads
+  `directx_Jun2010_redist.exe` from Microsoft and runs it only if it is signed by Microsoft,
+- sets the base Generals data folder in the registry if the entry is missing or points to a folder
+  that no longer exists (Zero Hour loads the original game's `.big` files from there),
+- adds a "Zero Hour (LAN)" desktop shortcut.
+
+There is one administrator prompt (needed for the firewall rule, DirectX and installs under Program
+Files). `Uninstall.cmd` removes the exe, the firewall rule and the shortcut.
+
+Everyone in a LAN game must run the same `generalszh.exe`, because the game refuses players whose
+executable differs. Hand everyone the same zip; the installer prints the exe's checksum to compare.
+
+### Making a release
+
+Push a tag that starts with `v`:
+
+    git tag v0.1
+    git push origin v0.1
+
+CI builds the exe and publishes the zip as a GitHub release (a tag with a `-`, such as `v0.2-test`,
+becomes a pre-release). The repository is private, so download the zip from the release page and
+share it yourself. Every other push also builds the same folder as a CI artifact
+(Actions > the run > Artifacts).
 
 ## Building it yourself
 
-Linux (or WSL), cross-compiling with MinGW-w64:
+Windows, no setup: double-click `build.cmd` in the repository root, or run it from a command prompt:
+
+    build.cmd              # -> build\win32\dist\generalszh.exe
+    build.cmd -Install     # build, then run the installer with the new exe
+    build.cmd -Clean       # delete the build folder first
+
+The first run downloads a fixed version of GCC 13.2 (MinGW-w64, WinLibs), CMake and Ninja into
+`.tools\` (about 300 MB, checked against SHA-256 checksums). Nothing is installed system-wide. Put
+the repository in a short path such as `C:\src\zh`; very long paths can break the build.
+
+An exe you build yourself is not byte-for-byte identical to the release, even with the same compiler
+version, so it cannot join LAN games with players who use the release. Use it for testing, or give
+everyone your build.
+
+Linux (or WSL), cross-compiling with MinGW-w64, as CI does:
 
     sudo apt install g++-mingw-w64-i686-posix cmake ninja-build
     cmake -S GeneralsMD/Code -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-i686.cmake
