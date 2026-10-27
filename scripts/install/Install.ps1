@@ -307,6 +307,7 @@ function Install-DirectX {
 		Invoke-WebRequest -Uri $DirectXUrl -OutFile $redist -UseBasicParsing
 		Assert-MicrosoftSigned $redist
 		$files = Join-Path $work 'files'
+		New-Item -ItemType Directory -Path $files | Out-Null
 		$p = Start-Process -FilePath $redist -ArgumentList '/Q', "/T:`"$files`"" -Wait -PassThru
 		if ($p.ExitCode -ne 0) { Fail "Unpacking the DirectX runtime failed (exit code $($p.ExitCode))." }
 		$setup = Join-Path $files 'DXSETUP.exe'
