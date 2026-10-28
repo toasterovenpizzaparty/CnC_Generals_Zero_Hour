@@ -256,41 +256,8 @@ void LANAPI::handleRequestJoin( LANMessage *msg, UnsignedInt senderIP )
 			}
 #endif
 			
-			// check for a duplicate serial
-			AsciiString s;
-			for (player = 0; canJoin && player<MAX_SLOTS; ++player)
-			{
-				LANGameSlot *slot = m_currentGame->getLANSlot(player);
-				s.clear();
-				if (player == 0)
-				{
-					GetStringFromRegistry("\\ergc", "", s);
-				}
-				else if (slot->isHuman())
-				{
-					s = slot->getSerial();
-					if (s.isEmpty())
-						s = "<Munkee>";
-				}
-
-				if (s.isNotEmpty())
-				{
-					DEBUG_LOG(("Checking serial '%s' in slot %d\n", s.str(), player));
-
-					if (!strncmp(s.str(), msg->GameToJoin.serial, g_maxSerialLength))
-					{
-						// serials match!  kick the punk!
-						reply.LANMessageType = LANMessage::MSG_JOIN_DENY;
-						reply.GameNotJoined.reason = LANAPIInterface::RET_SERIAL_DUPE;
-						reply.GameNotJoined.gameIP = m_localIP;
-						reply.GameNotJoined.playerIP = senderIP;
-						canJoin = false;
-
-						DEBUG_LOG(("LANAPI::handleRequestJoin - join denied because of duplicate serial # (%s).\n", s.str()));
-						break;
-					}
-				}
-			}
+			// The original game refused a player whose CD key matched one already in the game.  That was
+			// copy protection; it also refused legitimate copies that share a key, so it is gone.
 
 			// We're the host, so see if he has a duplicate name
 			for (player = 0; canJoin && player<MAX_SLOTS; ++player)

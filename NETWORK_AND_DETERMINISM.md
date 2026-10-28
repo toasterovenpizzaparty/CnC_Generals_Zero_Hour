@@ -82,6 +82,9 @@ ways:
 1. **Players could join with a different exe or different game data.** The LAN join check that
    compares exe and INI checksums was commented out in the shipped code
    (`LANAPIhandlers.cpp`). It is re-enabled, so mismatched installs are refused at join time.
+   The other join check, which refused a player whose CD key matched one already in the game, is
+   removed: it was copy protection and also blocked legitimate copies that share a key. Joining
+   players no longer send their CD key.
 2. **CPU-dependent math.**
    - `WWMath::Sin/Cos` used the x87 `FSIN`/`FCOS` instructions, whose results differ between
      CPU vendors and generations.

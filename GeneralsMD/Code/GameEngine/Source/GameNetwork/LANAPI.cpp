@@ -636,10 +636,8 @@ void LANAPI::RequestGameJoin( LANGameInfo *game, UnsignedInt ip /* = 0 */ )
 	msg.GameToJoin.exeCRC = TheGlobalData->m_exeCRC;
 	msg.GameToJoin.iniCRC = TheGlobalData->m_iniCRC;
 
-	AsciiString s = "";
-	GetStringFromRegistry("\\ergc", "", s);
-	strncpy(msg.GameToJoin.serial, s.str(), g_maxSerialLength);
-	msg.GameToJoin.serial[g_maxSerialLength-1] = '\0';
+	// The CD key is no longer checked by the host (see handleRequestJoin), so it is not sent.
+	memset(msg.GameToJoin.serial, 0, sizeof(msg.GameToJoin.serial));
 
 	sendMessage(&msg, ip);
 
